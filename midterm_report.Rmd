@@ -1,0 +1,1192 @@
+---
+title: "Exploring the Impact of AI Tools on Stack Overflow: Post-ChatGPT Trends"
+author: "Sophie Xu"
+date: "March 14, 2025"
+output: github_document
+#  html_document: 
+#    highlight: kate
+#    theme: cosmo
+---
+
+```{r connect_python, message=FALSE, echo=FALSE, warning=FALSE}
+library(reticulate)
+```
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+# Scraping
+library(rvest)
+library(xml2)
+library(base)
+library(stringr)
+
+# Dataframe
+library(data.table)
+library(dtplyr)
+library(dplyr)
+library(reshape2)
+library(jsonlite)
+
+# Visualization
+library(leaflet)
+library(tidyverse)
+library(ggplot2)
+library(ggcorrplot)
+library(grid)
+library(gridExtra)
+library(viridis)
+library(plotly)
+library(wordcloud2)
+
+# Table
+library(kableExtra)
+
+# Model
+library(mgcv)
+
+# Language
+library(tm)
+library(tidytext)
+library(textdata)
+library(topicmodels)
+library(tokenizers)
+library(stringr)
+library(quanteda.textstats)
+```
+
+```{r setup2, echo=FALSE}
+knitr::opts_chunk$set(eval = F, include  = T)
+```
+
+### 1 Introduction
+
+**1.1. Background**
+
+This report examines the impact of AI-assisted coding tools on coding discussion forums. Large language models (LLM) have rapidly gained popularity and become integrated into daily life. In particular, programmers now frequently use AI-assisted coding tools such as ChatGPT, Gemini Code Assist, and GitHub Copilot in their workflows. The capabilities of these AI tools drew widespread attention when ChatGPT launched in November 2022, reaching over 100 million users within two months (Wikipedia contributors, 2024). To capture the short-term trend of this development, we restricted the analysis timeframe to 2021–2025, allowing for a comparison before and after ChatGPT’s release.
+
+**1.2 Dataset**
+
+The analysis focuses on Stack Overflow's public dataset, available through the Stack Exchange API. Stack Overflow is one of the largest question-and-answer platforms for programmers, with over 23 million users and nearly 60 million posts as of March 2024 (Wikipedia contributors, 2024). The API provides access to contents and interactions on Stack Overflow through entities such as Answers, Badges, and Comments (Stack Exchange, n.d.). For this study, we specifically examine the Posts, Tags, and Users data. Posts include both questions and answers, while Tags are the topics to categorize and organize content (Stack Overflow Teams, 2024). These data offer valuable insights into user engagement, content quality, and the evolving landscape of Stack Overflow over time.
+
+**1.3 Objective**
+
+To investigate the impact of AI-assisted coding tools on coding discussion forums, we focus on two key questions:
+
+1. Have AI tools reduced reliance on Stack Overflow for coding assistance?
+2. How have AI tools influenced the structure and content of forum posts?
+
+By analyzing these aspects, we aim to infer the effects of ChatGPT’s launch on Stack Overflow’s users and content, providing a preliminary answer to the research question.
+
+### 2 Methods
+
+**2.1 Acquire Data**
+
+The Stack Overflow’s public data was retrieved using the Stack Exchange API v2.3. Since anonymous API users have a daily quota limit, we registered for an API key (StackApps, n.d.). As instructed in the documentation, custom filters were created through the API to extract datasets with specific attributes. Once the desired filter was generated as an encoded string, we pass it along with the other parameters, `order`, `sort`, `site`, `fromdate`, `todate`, `page`, and `pagesize` to the API request. To ensure an even distribution of posts from 2021 to 2025, we generated a sequence of start and end dates for each month between 2021-01-01 and 2025-01-01, making separate requests for each month. We fixed pagesize at 100 and merged the retrieved monthly data to create a balanced dataset over the timeframe. For user data, we used a timeframe from 2021-01-01 to 2024-04-01, constrained by API quota limits. For tags, since the Stack Exchange database contains approximately 65,000 tags, we retrieved the entire dataset without filtering. In total, we collected three datasets—posts, users, and tags—amounting to approximately 97 MB. The data was stored as CSV files for easy reuse. The retrieval process was implemented using the `httr` package in R.
+
+**2.2 Data Cleaning and Wrangling**
+
+2.2.1 Cleaning and Wrangling
+
+To ensure the dataset was in a usable format, we first inspected and summarized each dataset. We found that 93.77% of `location` data in the users dataset and 0.94% of `owner_id` data in the posts dataset were missing, while all other variables had complete data. Given the focus of this analysis, we omitted the `location` variable but retained `owner_id`. Next, we reviewed all variables, removing irrelevant ones and renaming the rest for clarity. Exploratory visualizations revealed highly correlated and duplicate variables, which we also removed. Additionally, we identified two article entries in the posts dataset that were neither questions nor answers and excluded them. Based on the distribution and usage of tags, we decided to retain only the 100 most popular tags for analysis.
+
+We then consolidated variables into new variables tailored to our question. We introduced `lifespan`, calculated as the time gap between creation and last access/modification dates in both the users and posts datasets. Based on the distribution of lifespan, reputation, and total badge counts, we categorized users into three engagement levels: "Expert", "Experienced", and "Normal". Similarly, we classified posts into three engagement levels based on lifespan, vote counts, and score: "High", "Moderate", and "Low". We also introduced a `quality` variable for posts, categorizing them as: "Good", "Normal", "Bad", and "Controversial".
+
+2.2.2 Natural Language Processing (NLP)
+
+The text content of posts was also classified into new categorical variables. We identified error-related keywords (e.g., segmentation fault), actionable language (e.g., fix), and contextual phrases (e.g., ASAP), combining these into a score to categorize a post’s `intention` as either debugging or discussion. Similarly, we developed a `complexity` score based on posts’ lengths, markdown structure, number of technical terms, and vocabulary diversity, classifying posts as either basic or complex. In addition, we tokenized the post body and assigned one of the 100 most popular tags by matching tokens to tags and selecting the highest-frequency match. We also applied LDA topic modeling to determine whether a post was AI-related. Since NLP tasks are computationally intensive, we stored the processed posts dataset as a CSV file for efficient reuse. Lastly, we merged the users and posts datasets using the post owner’s user ID, enabling analysis of user-post relationships. Note the data cleaning and wrangling process used R packages including `tidyverse`, `dplyr`, and `data.table`, while the NLP tasks relied on `stringr`, `topicmodels`, and `tokenizers`.
+
+**2.3 Visualization and Modeling**
+
+For exploratory data analysis, we employed various visualizations, including histograms, density plots, heatmaps, scatter plots, and bar plots, to illustrate dataset distributions and correlations. For statistical analysis, we transformed creation dates into daily and quarterly intervals to compute post counts and analyze trends as a time series. We applied linear regression models (LMs) and generalized additive models (GAMs) to examine correlations. The findings were primarily visualized using scatter plots and line plots. The visualizations were created using R packages including `tidyverse`, `ggplot2`, `ggcorrplot`, and `gridExtra`, while the modeling process utilized `mgcv` .
+
+[comment]: <> (Step 1: Retrieve and Load Data)
+
+```{r api_function, eval=TRUE, echo=FALSE, message=FALSE}
+api_key <- "rl_sV67BVvG8ogoeRPbhaTc8oQZm"
+base_url <- "https://api.stackexchange.com/2.3"
+
+fetch_monthly_data <- function(endpoint, params, start_date = NULL, end_date = NULL, pagesize = NULL, pages = NULL) {
+  all_data <- list()
+  params$key <- api_key
+  url <- paste0("https://api.stackexchange.com/2.3", endpoint)
+
+  if (!is.null(start_date) & !is.null(end_date)) {
+    fromdate <- as.numeric(as.POSIXct(start_date, format = "%Y-%m-%d"))
+    todate <- as.numeric(as.POSIXct(end_date, format = "%Y-%m-%d"))
+    params$fromdate <- fromdate
+    params$todate <- todate
+  }
+  
+  if (!is.null(pagesize) & !is.null(pages)) {
+    params$pagesize <- pagesize
+    for (page in 1:pages) {
+      params$page <- page
+      response <- httr::GET(url, query = params)
+      
+      status_code <- httr::status_code(response)
+      content <- httr::content(response)
+      if (status_code != 200) {
+          print(status_code)
+          print(content)
+      }
+      
+      data <- content$items
+      all_data <- append(all_data, data)
+      Sys.sleep(2)
+    }
+  }
+  else {
+    response <- httr::GET(url, query = params)
+    all_data <- append(all_data, data)
+  }
+  return(all_data)
+}
+```
+
+```{r api_helper, eval=TRUE, echo=FALSE, message=FALSE}
+generate_months <- function(start_date, end_date) {
+  seq.Date(as.Date(start_date), as.Date(end_date), by = "month")
+}
+months <- generate_months("2021-01-01", "2025-01-01")
+```
+
+```{r create_filter, eval=TRUE, echo=FALSE, message=FALSE}
+custom_filter <- function(include, base, unsafe) {
+  url <- paste0(base_url, "/filters/create")
+  params <- list(include=include, base=base, unsafe=unsafe, key = api_key)
+  response <- httr::GET(url, query = params)
+  filter_detail <- httr::content(response)$items
+  return(filter_detail[[1]]$filter)
+}
+```
+
+```{r fetch_posts, eval=TRUE, echo=FALSE, message=FALSE}
+include <- "post.up_vote_count;post.down_vote_count;post.body_markdown"
+posts_filter <- custom_filter(include, "default", FALSE)
+if (!file.exists("posts.csv")) {
+  data <- list()
+  for (i in 1:(length(months) - 1)) {
+    from_date <- months[i]
+    to_date <- months[i + 1]
+    monthly_data <- fetch_monthly_data(
+      endpoint = "/posts",
+      params = list(order = "desc", 
+                    sort = "creation", 
+                    site = "stackoverflow", 
+                    filter = posts_filter),
+      start_date = from_date,
+      end_date = to_date,
+      pagesize = 100,
+      pages = 10
+    )
+    print(from_date)
+    data <- append(data, monthly_data)
+    print(length(data))
+  }
+  df <- bind_rows(lapply(data, as.data.frame))
+  write.csv(df, "posts.csv", row.names = FALSE)
+} else {
+  posts_df <- fread("posts.csv")
+}
+```
+
+```{r fetch_users, eval=TRUE, echo=FALSE, message=FALSE}
+include <- "user.answer_count;user.down_vote_count;user.question_count;user.up_vote_count;user.viewcount"
+users_filter <- custom_filter(include, "default", FALSE)
+if (!file.exists("users.csv")) {
+  data <- list()
+  for (i in 1:(length(months) - 1)) {
+    from_date <- months[i]
+    to_date <- months[i + 1]
+    user_data <- fetch_monthly_data(
+      endpoint = "/users",
+      params = list(order = "desc", 
+                    sort = "creation", 
+                    site = "stackoverflow",
+                    filter = users_filter),
+      start_date = from_date,
+      end_date = to_date,
+      pagesize = 100,
+      pages = 5
+    )
+    print(from_date)
+    data <- append(data, user_data)
+    print(length(data))
+  }
+  df <- bind_rows(lapply(data, as.data.frame))
+  df <- df |> select(-matches("^(posted_by_collectives|collectives)"))
+  write.csv(df, "users.csv", row.names = FALSE)
+} else {
+  users_df <- fread("users.csv")
+}
+```
+
+```{r fetch_tags, eval=TRUE, echo=FALSE, message=FALSE}
+if (!file.exists("tags.csv")) {
+  data <- fetch_monthly_data(
+    endpoint = "/tags",
+    params = list(order = "desc", 
+                  sort = "popular", 
+                  site = "stackoverflow"),
+    pagesize = 100,
+    pages = 660
+  )
+  df <- bind_rows(lapply(data, as.data.frame))
+  write.csv(df, "tags.csv", row.names = FALSE)
+} else {
+  tags_df <- fread("tags.csv")
+}
+```
+
+```{r fetch_comments, eval=FALSE, echo=FALSE, message=FALSE}
+include <- "comment.upvoted;comment.body_markdown"
+comments_filter <- custom_filter(include, "default", FALSE)
+
+posts_ids <- unique(posts_df$post_id)
+chunks <- split(posts_ids, ceiling(seq_along(posts_ids) / 100))
+
+if (!file.exists("comments.csv")) {
+  data <- list()
+  for (i in 1:length(chunks)) {
+    ids <- paste(chunks[[i]], collapse = ";")
+    link_data <- fetch_monthly_data(
+      endpoint = paste0("/posts/", ids, "/comments"),
+      params = list(order = "desc", 
+                    sort = "creation", 
+                    site = "stackoverflow", 
+                    ids = ids,
+                    filter = comments_filter),
+      start_date = "2021-01-01", 
+      end_date = "2025-01-01", 
+      pagesize = 100,
+      pages = 10
+    )
+    print(i)
+    data <- append(data, link_data)
+    print(length(data))
+  }
+  df <- bind_rows(lapply(data, as.data.frame))
+  df <- df |> select(-matches("^(posted_by_collectives|collectives)"))
+  write.csv(df, "comments.csv", row.names = FALSE)
+} else {
+  comments_df <- fread("comments.csv")
+}
+```
+
+[comment]: <> (Step 2: Wrangle Data)
+
+```{r wrangle_posts, eval=TRUE, echo=FALSE, message=FALSE}
+# Rename and Select Variables
+colnames(posts_df) <- c("rm_account_id", "rm_reputation", "owner_id",
+                        "rm_user_type", "rm_pfp", "rm_username",
+                        "rm_user_link", "downvote_count", "upvote_count",
+                        "score", "last_activity_date", "creation_date",
+                        "post_type", "post_id", "body",
+                        "rm_link", "rm_user_ar", "rm_last_edit")
+posts_df <- posts_df |> select(-matches("^rm"))
+```
+
+```{r wrangle_users, eval=TRUE, echo=FALSE, message=FALSE}
+# Rename and Select Variables
+colnames(users_df) <- c("bronze_count", "silver_count", "gold_count",
+                        "downvote_count", "upvote_count", "answer_count",
+                        "question_count", "rm_acc_id", "rm_employee",
+                        "last_access_date", "rep_year", "rep_quarter",
+                        "rep_month", "rep_week", "rep_day",
+                        "reputation", "creation_date", "rm_type",
+                        "user_id", "rm_link", "rm_pfp",
+                        "rm_name", "rm_last_modified", "location",
+                        "rm_url")
+users_df <- users_df |> select(-matches("^rm"))
+```
+
+```{r wrangle_tags, eval=TRUE, echo=FALSE, message=FALSE}
+# Rename and Select Variables
+tags_df <- tags_df |>
+  select(-matches("^Id|Id$")) |>
+  rename("name" = "TagName", "count" = "Count")
+```
+
+[comment]: <> (Step 2.5: Inspect Data)
+
+```{r variables, eval=FALSE, echo=FALSE, message=FALSE}
+# See All Variables
+print("Users: ")
+colnames(users_df)
+print("Posts: ")
+colnames(posts_df)
+print("Tags: ")
+colnames(tags_df)
+```
+
+```{r missing_data, eval=FALSE, echo=FALSE, message=FALSE}
+# Check Missing Values in Each Dataset
+user_missing <- colSums(is.na(users_df))
+user_missing <- user_missing[user_missing > 0]
+round((user_missing / nrow(users_df)) * 100, 2)
+
+post_missing <- colSums(is.na(posts_df))
+post_missing <- post_missing[post_missing > 0]
+round((post_missing / nrow(posts_df)) * 100, 2)
+
+colSums(is.na(tags_df))
+```
+
+```{r inspect_data, eval=FALSE, echo=FALSE, message=FALSE}
+# User: Investigate the Distribution of Reputation
+print(summary(users_df[, c("reputation", "rep_year", "rep_quarter", 
+                           "rep_month", "rep_week", "rep_day")]))
+
+thresholds <- c(10, 25, 50, 75, 100, 250, 500, 1000, 2000)
+counts <- sapply(thresholds, function(x) sum(users_df$reputation > x))
+threshold_summary <- data.frame(Threshold = thresholds, Count = counts)
+print(threshold_summary)
+```
+
+```{r inspect_data2, eval=FALSE, echo=FALSE, message=FALSE}
+# User: Check Downvotes vs Upvotes
+summary(users_df[, c("bronze_count", "silver_count", "gold_count",
+                     "upvote_count", "downvote_count")])
+
+downvoters <- users_df |> filter(downvote_count > 0)
+print(round((nrow(downvoters) / nrow(posts_df)) * 100, 2))
+```
+
+```{r inspect_data3, eval=FALSE, echo=FALSE, message=FALSE}
+# Posts: Check Post Type
+unique(posts_df$post_type)
+posts_df |>
+  filter(post_type == "article") |>
+  head()
+```
+
+```{r inspect_data4, eval=FALSE, echo=FALSE, message=FALSE}
+# Posts: Investigate Distribution of Lifespan
+posts_df$lifespan <- as.numeric(difftime(posts_df$last_activity_date, 
+                                         posts_df$creation_date, units = "days"))
+summary(posts_df$lifespan)
+print(round((nrow(posts_df |> filter(lifespan == 0)) / nrow(posts_df)) * 100, 2))
+
+thresholds <- c(7, 14, 30, 120, 180, 365, 365*2, 365*3)
+counts <- sapply(thresholds, function(x) sum(posts_df$lifespan > x))
+threshold_summary <- data.frame(Threshold = thresholds, Count = counts)
+print(threshold_summary)
+```
+
+```{r inspect_data5, eval=FALSE, echo=FALSE, message=FALSE}
+# Posts: Score around Zero
+controversial <- posts_df |> 
+  filter (1/10 < upvote_count / downvote_count & upvote_count / downvote_count < 10)
+print(round(nrow(controversial)/nrow(posts_df) * 100, 2))
+```
+
+
+### 3 Preliminary Results
+
+**3.1 Exploratory Data Analysis**
+
+3.1.1 Post
+
+Most of the variables measuring engagement and quality in the users and posts dataset exhibit strong skewness. Notably, 45.16% of posts are active for less than 24 hours, while 9.07% are active for more than a week.  As illustrated in Figure 1, both distributions have a light, long right tail, emphasizing this skewness.
+
+[comment]: <> (Step 3: Exploratory Data Analysis)
+
+```{r eda2, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+# User Lifespan
+users_df$lifespan <- as.numeric(difftime(users_df$last_access_date, 
+                                         users_df$creation_date, units = "days"))
+p3 <- ggplot(users_df, aes(x = lifespan)) +
+      geom_histogram(bins = 30, fill = "goldenrod2", color = "white") +
+      labs(title = "Distribution of Users' Active Lifespan", 
+           x = "Lifespan (in days)", 
+           y = "Count") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"))
+
+# Posts Lifespan
+posts_df$lifespan <- as.numeric(difftime(posts_df$last_activity_date, 
+                                         posts_df$creation_date, units = "days"))
+life_post <- posts_df |> select(post_id, lifespan) |> filter(lifespan > 7)
+p4 <- ggplot(life_post, aes(x = lifespan)) +
+      geom_histogram(bins = 30, fill = "goldenrod4", color = "white") +
+      labs(title = "Active More Than a Week: Distribution of Posts' Lifespan", 
+           x = "Lifespan (in days)", 
+           y = "Count") +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"))
+
+caption <- grid::textGrob("Figure. 1", gp = gpar(fontsize = 11)) # fontface = "italic", 
+grid.arrange(arrangeGrob(p3, p4, nrow = 2), 
+             bottom = caption, 
+             heights = unit(c(24, 1), "null"))
+```
+
+Only 5.65% of posts are controversial, meaning they receive a significant number of both upvotes and downvotes. While one might expect a negative correlation between upvotes and downvotes, Figure 2 suggests otherwise. The line of best fit indicates that posts with more upvotes tend to also receive more downvotes, possibly due to the polarizing nature of controversial posts.
+
+```{r eda4, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+# Upvote vs Downvote Counts
+ggplot(posts_df, aes(x = upvote_count, y = downvote_count)) +
+  geom_point(alpha = 0.5, color = "goldenrod3") +
+  geom_smooth(method = "lm", color = "wheat2", se = FALSE) +
+  labs(title = "Trend in Post Upvotes vs. Downvotes", x = "Upvote Count", y = "Downvote Count", caption = "Figure. 2") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+The skewness could be explained by the possibility that a small proportion of basic, broadly useful questions generate high engagement, while the majority of questions are niche-specific and engage only a small subset of users. Additionally, controversial posts may attract high engagement due to their inherently divisive nature.
+
+3.1.2 User
+
+A similar skewed distribution is observed in the users dataset. Users are far more likely to upvote posts as a form of agreement or encouragement, while only 0.04% have ever downvoted a post. Badge counts also reflect this imbalance, up to the third quantile, users hold zero silver or gold badges, as well as zero upvotes or downvotes. Likewise, user reputation follows an extreme skew, with the minimum, median, and third quantile all valued at 1, while the maximum reaches 4,341. Interestingly, Figure 3 reveals a second mode in the reputation distribution.
+
+```{r eda1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+# Filter Users with Non-Minimal Reputation
+rep_user <- users_df |> 
+  select(user_id, reputation, rep_year, rep_quarter, rep_month, rep_week) |>
+  filter(reputation > 10)
+rep_change <- rep_user |>
+  filter(!(rep_year == 0 & rep_quarter == 0 & rep_month == 0 & rep_week == 0)) |>
+  mutate(across(c(rep_year, rep_quarter, rep_month, rep_week), 
+                ~ ifelse(. == 0, . + 1e-3, .)))
+
+# Create Graph
+p1 <- ggplot(rep_user, aes(x = reputation)) +
+  geom_histogram(bins = 40, fill = "deeppink3", color = "white", alpha = 0.6) +
+  scale_x_log10() +
+  labs(title = "Total Reputation Distribution", x = "Reputation (Log Scale)", y = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"))
+
+p2 <- ggplot() +
+  geom_density(data=rep_change, aes(x = rep_year, color = "Year"), linewidth = 1) +
+  geom_density(data=rep_change, aes(x = rep_quarter, color = "Quarter"), linewidth = 0.5) +
+  geom_density(data=rep_change, aes(x = rep_month, color = "Month"), linewidth = 1) +
+  geom_density(data=rep_change, aes(x = rep_week, color = "Week"), linewidth = 0.5) +
+  scale_color_manual(name = "Metric", values = c("Year" = "darkolivegreen2", 
+                                                 "Quarter" = "darkolivegreen3", 
+                                                 "Month" = "wheat", 
+                                                 "Week" = "wheat3")) +
+  labs(title = "Reputation Changes Over Time", 
+       x = "Value", 
+       y = "Density") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.box = "horizontal",
+        legend.justification = "center",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+
+caption <- grid::textGrob("Figure. 3", gp = gpar(fontsize = 11)) # fontface = "italic", 
+grid.arrange(arrangeGrob(p1, p2, ncol = 2), 
+             bottom = caption, 
+             heights = unit(c(24, 1), "null"))
+```
+
+The density distribution of reputation changes over months nearly coincides with weekly changes, and similarly, quarterly changes align with yearly trends. This is supported by Figure 4, where the correlation matrix shows that reputation changes over different time intervals are highly correlated (>0.95). Additionally, reputation is strongly correlated with answer count (0.85) and silver badge count (0.68).
+
+```{r eda3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='center'}
+# Correlation Plot
+numeric_users <- select(users_df, where(is.numeric)) |> select(-user_id)
+corr_matrix <- cor(numeric_users, use = "complete.obs")
+ggcorrplot(corr_matrix, method = "square", type = "lower",
+           lab = TRUE, lab_size = 2.4,
+           colors = c("olivedrab", "white", "deeppink3"),
+           title = "Correlation Heatmap") + 
+  labs(caption = "Figure. 4") +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+These findings suggest that a small percentage of users actively engage in discussions, while the majority passively browse and search for information.
+
+3.1.3 Tag
+
+The tags dataset is straightforward—the top 20 tags correspond to widely used programming languages and concepts. JavaScript ranks first, followed by Python and Java.
+
+```{r eda5, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+tags_df |>
+  arrange(across(count, desc)) |>
+  head(20) |>
+  ggplot(aes(fct_reorder(name, count), count)) +
+  geom_bar(stat="identity", fill="olivedrab3") +
+  coord_flip() +
+  labs(title = "Top 20 Most Popular Tags", x = "Tag", y = "Count", caption = "Figure. 5") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+[comment]: <> (Step 3.5: Wrangle Data II)
+
+```{r wrangle_data, eval=TRUE, echo=FALSE, message=FALSE}
+# Wrangle Data Again Based on EDA Results
+users_df <- users_df |> select(-matches("location|rep_day|rep_week|rep_quarter"))
+posts_df <- posts_df |>
+  filter(post_type != "article") |>
+  mutate(post_type = factor(post_type, levels = c("answer", "question")))
+
+users_df$badge_count <- users_df$bronze_count + users_df$silver_count + users_df$gold_count
+posts_df$vote_count <- posts_df$upvote_count + posts_df$downvote_count
+
+popular_tags <- tags_df |>
+  arrange(across(count, desc)) |>
+  head(100)
+```
+
+[comment]: <> (Step 4: Define Parameter of Interest)
+[comment]: <> (Consolidate Variables)
+
+```{r inspect_data6, eval=FALSE, echo=FALSE, message=FALSE}
+# Define Classification Metric Based on Percentile
+print_percentiles <- function(data, variable) {
+  percentiles <- round(quantile(data[[variable]], probs = seq(0, 1, 0.05), na.rm = TRUE), 2)
+  print(variable)
+  print(percentiles)
+}
+```
+
+```{r inspect_data6-5, eval=FALSE, echo=FALSE, message=FALSE}
+# Posts
+print_percentiles(posts_df, "lifespan")
+print_percentiles(posts_df, "upvote_count")
+print_percentiles(posts_df, "downvote_count")
+print_percentiles(posts_df, "score")
+
+# Users
+print_percentiles(users_df, "lifespan")
+print_percentiles(users_df, "upvote_count")
+print_percentiles(users_df, "question_count")
+print_percentiles(users_df, "answer_count")
+print_percentiles(users_df, "badge_count")
+print_percentiles(users_df, "reputation")
+```
+
+```{r classify_user, eval=TRUE, echo=FALSE, message=FALSE}
+# Classify Users
+users_df <- users_df |> 
+  mutate(engagement = case_when(
+    (badge_count == 1 | reputation < 11) & (lifespan > 60 & lifespan < 365 * (2 + 1/4)) ~ "experienced",
+    (badge_count >= 2 | reputation >= 11) | lifespan > 365 * (2 + 1/4) ~ "expert",
+    TRUE ~ "normal"))
+users_df <- users_df |> 
+  mutate(across(c(engagement), as.factor))
+```
+
+```{r classify_post, eval=TRUE, echo=FALSE, message=FALSE}
+# Classify Posts
+posts_df <- posts_df |> 
+  mutate(engagement = case_when(
+    lifespan > 5 | vote_count >= 2 ~ "high",
+    lifespan < 1 | vote_count == 0 ~ "low",
+    TRUE ~ "moderate"))
+
+posts_df <- posts_df |> 
+  mutate(quality = case_when(
+    1/10 < upvote_count / downvote_count & upvote_count / downvote_count < 10 ~ "controversial",
+    score >= 2  ~ "good",
+    score < 0 ~ "bad",
+    TRUE ~ "normal"))
+
+posts_df <- posts_df |> 
+  mutate(across(c(engagement, quality), as.factor))
+```
+
+[comment]: <> (Classify Post Content)
+
+```{r python_code, eval=FALSE, echo=FALSE, message=FALSE}
+# NLP Classification
+py_require("tqdm")
+py_require("torch")
+py_require("transformers")
+#reticulate::py_config()
+
+py_run_string("
+from transformers import pipeline
+from tqdm import tqdm
+
+classifier = pipeline('zero-shot-classification', model='facebook/bart-large-mnli')
+
+def classify_text(texts, candidate_labels):
+    results = []
+    for text in tqdm(texts, desc='Classifying texts', unit='text'):
+        result = classifier(text, candidate_labels=candidate_labels)
+        results.append(result['labels'][0] if result['scores'][0] > 0.5 else None)
+    return results
+")
+```
+```{r classify_content, eval=FALSE, echo=FALSE, message=FALSE}
+merged_df$tag <- py$classify_text(merged_df$body, popular_tags$name)
+```
+
+```{r classify_tag, eval=TRUE, echo=FALSE, message=FALSE}
+key_words <- c("AI", "Artificial Intelligence", "ML", "Machine Learning", 
+               "GPT", "Llama", "Claude", "DeepSeek", "DALL-E", "Gemini",
+               "LLM", "Large Language Model", "Neural Network", "SVM",
+               "Deep Learning", "DL", "Reinforcement Learning", "RL",
+               "Natural Language Processing", "NLP", "fine-tun", "fine tun",
+               "train model", "backprop", "back propagation", "gradient descent")
+
+if (!file.exists("processed_posts.csv")) {
+  classify_tag <- function(posts_df, tags) {
+    post_tags <- vector("character", nrow(posts_df))
+    post_relevance <- logical(nrow(posts_df))
+    
+    for (i in 1:nrow(posts_df)) {
+      # Tokenization
+      tokens <- unlist(str_split(tolower(posts_df$body[i]), "\\W+"))
+      tokens <- tokens[!tokens %in% stopwords("en")]
+      tokens <- tokens[tokens != ""]
+      tokens <- tokens[tokens != "quot"]
+      tokens <- tokens[!grepl("^\\d+$", tokens)]
+      token_df <- data.frame(word = tokens, stringsAsFactors = FALSE)
+      token_freq <- token_df |>
+        group_by(word) |>
+        summarise(frequency = n()) |>
+        arrange(across(frequency, desc)) 
+      
+      # Match Tags
+      tag_matches <- popular_tags |>
+        filter(tolower(name) %in% tolower(token_freq$word)) |>
+        select(-"count") |>
+        mutate(count = {
+          counts <- list(100)
+          for (i in seq_along(name)) {
+            counts[i] <- sum(token_freq$frequency[token_freq$word == tolower(name[i])])
+          }
+          counts
+        })
+      
+      # Classify Tag
+      if (nrow(tag_matches) == 0) {
+        post_tags[i] <- "None"
+      }
+      else {
+        best_match <- tag_matches |>
+          arrange(desc(count)) |>
+          slice(1) |>
+          pull(name)
+        post_tags[i] <- best_match
+      }
+      
+      # LDA Topic Modeling
+      dtm <- DocumentTermMatrix(token_freq) |> as.matrix()
+      lda_model <- LDA(dtm, k = 3, control=list(seed=42))
+      lda_topics <- topics(lda_model)
+      
+      # Classify Relevance
+      top_terms <- terms(lda_model, 5)
+      top_words <- unique(unlist(top_terms))
+      topic_match <- any(sapply(key_words, function(keyword) keyword %in% top_words))
+      keyword_match <- any(token_freq$word %in% key_words)
+      post_relevance[i] <- (keyword_match | topic_match)
+  
+      # Progress Bar
+      if (i %% 100 == 0) {
+        cat("Processed", i, "posts...\n")
+      }
+    }
+    
+    return(data.frame(tag = post_tags, relevance = post_relevance))
+  }
+  result <- classify_tag(posts_df, popular_tags)
+  posts_df$tag <- result$tag
+  posts_df$relevance <- result$relevance
+} else {
+  posts_df <- fread("processed_posts.csv")
+  posts_df <- posts_df |>
+    mutate(
+        across(c(post_type, engagement, quality, 
+                 intention, complexity, tag, relevance), as.factor),
+        across(c(owner_id, downvote_count, upvote_count, 
+                 score, post_id, vote_count), as.integer),
+        across(c(lifespan, complexity_score, debug_score), as.numeric),
+        last_activity_date = as.POSIXct(last_activity_date, format = "%Y-%m-%d %H:%M:%S"),
+        creation_date = as.POSIXct(creation_date, format = "%Y-%m-%d %H:%M:%S"))
+}
+```
+
+```{r classify_type, eval=TRUE, echo=FALSE, message=FALSE}
+classify_type <- function(body) {
+  # Specific Error Message
+  error_keywords <- c("error", "exception", "bug", "stack trace", 
+                      "failed", "crash", "segmentation fault",
+                      "null pointer", "memory leak")
+  error_count <- sum(str_detect(body, fixed(error_keywords)))
+  
+  # Actionable Language
+  actionable_phrases <- c("fix", "resolve", "help")
+  actionable_count <- sum(str_detect(body, fixed(actionable_phrases)))
+  
+  # Contextual Urgency
+  urgency_phrases <- c("ASAP", "urgent", "immediate")
+  urgency_count <- sum(str_detect(body, fixed(urgency_phrases)))
+  
+  # Compute Score
+  debug_score <- error_count * 5 + actionable_count * 3.5 + urgency_count * 1.5
+  return(debug_score)
+}
+
+if (!file.exists("processed_posts.csv")) {
+  posts_df$debug_score <- sapply(posts_df$body, classify_type)
+  posts_df <- posts_df |>
+    mutate("intention" = factor(case_when(
+      debug_score > 3.5 ~ "Debug",
+      debug_score <= 3.5 ~ "Discussion"
+    )))
+}
+```
+
+```{r classify_complexity, eval=TRUE, echo=FALSE, message=FALSE}
+classify_complexity <- function(posts_df) {
+  complexity_score <- list(nrow(posts_df))
+  for (i in 1:nrow(posts_df)) {
+    body <- posts_df$body[i]
+    
+    # Length of the post
+    tokens <- str_split(tolower(body), "\\W+")[[1]]
+    word_count <- length(tokens)
+    
+    # Average sentence length
+    sentence_count <- str_count(body, "[.!?]")
+    avg_sentence_length <- ifelse(sentence_count == 0, 0, word_count / sentence_count)
+    
+    # Markdown Structure
+    heading_count <- str_count(body, "##|###")
+    bullet_point_count <- str_count(body, "-|\\*")
+    
+    # Vocabulary diversity
+    unique_words <- length(unique(tokens))
+    vocab_diversity <- unique_words / word_count
+    
+    # Readability score
+    #readability_score <- textstat_readability(body)$Flesch
+    
+    # Tag Terms
+    tech_term_count <- sum(str_detect(body, fixed(popular_tags$name, ignore_case = TRUE)))
+    
+    # Compute Score
+    complexity_score[i] <- word_count * 2.5 + avg_sentence_length * 1 +
+      vocab_diversity * 2 + heading_count * 1.5 + bullet_point_count * 1.5 + 
+      tech_term_count * 1.5 # + readability_score * 2
+    
+    # Progress Bar
+    if (i %% 100 == 0) {
+      cat("Processed", i, "posts...\n")
+    }
+  }
+  return(complexity_score)
+}
+
+if (!file.exists("processed_posts.csv")) {
+  result <- classify_complexity(posts_df)
+  posts_df$complexity_score <- unlist(result)
+  posts_df <- posts_df |>
+    mutate("complexity" = factor(case_when(
+      complexity_score > 800 ~ "Complex",
+      complexity_score <= 800 ~ "Basic"
+    )))
+  write.csv(posts_df, "processed_posts.csv", row.names = FALSE)
+}
+```
+
+```{r merge_data, eval=TRUE, echo=FALSE, message=FALSE}
+# Merge Dataset
+posts_wrangled <- posts_df |>
+  select(post_id, owner_id, post_type, creation_date, engagement, quality, body)
+users_wrangled <- users_df |>
+  select(user_id, creation_date, engagement)
+
+merged_df <- inner_join(posts_wrangled, users_wrangled, by = c("owner_id" = "user_id"))
+merged_df <- merged_df |> 
+  rename_with(~ gsub("(.*)\\.x$", "post_\\1", .), .cols = everything()) |> 
+  rename_with(~ gsub("(.*)\\.y$", "owner_\\1", .), .cols = everything())
+merged_df <- merged_df |>
+  rename("post_quality" = "quality", "post_body" = "body")
+```
+
+
+[comment]: <> (Modeling Visualizations)
+
+**3.2 Statistical Modeling**
+
+3.2.1 Impact on Reliance
+
+Recall we are interested in whether ChatGPT’s launch reduced programmers' reliance on Stack Overflow. Figure 6 shows a clear decline in basic question posts since 2022. The linear model suggests that time variables significantly impacted post counts ($p \approx 1.31e-4$). Introducing the categorical variable (`turnpoint`) for posts before and after November 2022 improved the model, with an adjusted R-squared of 0.394 ($p \approx 1.08e-6$). The GAM captures the non-linear trend, explaining 66.8% of the variance ($p < 2e-16$). These results suggest a decrease in basic coding questions, possibly due to the use of AI tools instead of forums for basic coding help.
+
+```{r q1-1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+npost_basic <- posts_df |>
+  filter(complexity == "Basic", post_type == "question") |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval) |>
+  summarise(post_count = n(), .groups = 'drop')
+
+npost_basic |>
+  ggplot(aes(x = time_interval, y = post_count)) +
+    geom_point(color = "wheat2") +
+    geom_smooth(method = "loess", color = "wheat4", linewidth = 0.8, se = FALSE) +
+    labs(title = "Distribution of Basic Question Post Counts vs Time",
+         x = "Time",
+         y = "Post Count",
+         caption = "Figure. 6") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+          plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+We also hypothesized that AI tools might reduce the number of normal users posting questions. Figure 7 shows an increase in posts from 2022 to June 2023, followed by a sharp decline. The linear model with interaction terms between time and user engagement indicates that time ($p \approx 0.015$), expert users ($p \approx 2.64e-5$), and their interaction ($p \approx 4.03e-5$) significantly affect post counts. The GAM model explains 60.4% of the variance, outperforming the linear model. Note these results are based on the merged dataset instead of full datasets, which may introduce sample bias due to its smaller size.
+
+```{r q1-2, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+npost_merged <- merged_df |>
+  mutate(time_interval = floor_date(post_creation_date, "day")) |>
+  group_by(time_interval, owner_engagement) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, owner_engagement, fill = list(post_count = 0))
+
+ggplot(npost_merged, aes(x = time_interval, y = post_count, color = owner_engagement)) +
+  geom_point() +
+  geom_smooth(method = "loess", aes(group = owner_engagement), se = FALSE, linewidth = 0.8) +
+  scale_color_manual(values = c("normal" = "darkolivegreen1", 
+                                "experienced" = "darkolivegreen3", 
+                                "expert" = "darkolivegreen")) +
+  labs(title = "Distribution of Post Counts vs Time By User Engagement",
+       x = "Time",
+       y = "Post Count",
+       caption = "Figure. 7") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+Additionally, we believe that the ratio of user types might have changed due to the emergence of AI tools. Figure 8 shows the `toexperienced` ratio ($\frac{\text{# experienced users}}{\text{# normal users}}$) increased since 2022, while the `toexpert` ratio ($\frac{\text{# expert users}}{\text{# normal users}}$) decreased since 2021. Despite LM and GAM models showing high significance for `toexpert`, neither could confirm the importance of AI tools in shifting the `toexperienced` ratio.
+
+```{r q1-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+user_ratio <- users_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, engagement) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = engagement, values_from = count, values_fill = list(count = 0)) |>
+  mutate(
+    toexperienced = `experienced` / `normal`,
+    toexpert = `expert` / `normal`
+  ) |>
+  complete(time_interval, fill = list(experienced = 0, normal = 0, expert = 0))
+
+user_ratio_long <- user_ratio |>
+  pivot_longer(cols = c(toexperienced, toexpert),
+               names_to = "ratio_type", 
+               values_to = "ratio_value")
+
+ggplot(user_ratio_long, aes(x = time_interval, y = ratio_value, color = ratio_type)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 0.8) + 
+  scale_color_manual(values = c("toexperienced" = "gold", "toexpert" = "gold3")) +
+  labs(title = "Distribution of User Engagement Ratio vs Time",
+       x = "Time",
+       y = "User Engagement Ratio",
+       caption = "Figure. 8") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        legend.position = "top",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+In summary, AI-assisted coding tools appear to have reduced reliance on coding forums among beginner programmers but likely had no significant impact on the engagement levels of advanced users.
+
+3.2.2 Impact on Content Structure
+
+We are also interested in exploring whether the use of LLM coding assistance influenced forum post content. Figure 9 compares debugging and discussion posts, showing a slight increase in normal debugging posts since 2023, while other types remained stable. The distribution of posts’ lengths is examined through a boxplot, which did not reveal significant trends. Figure 10 illustrates a significant increase in the ratio of complex to basic posts over time. The LM and GAM models all indicate that the time variable and `turnpoint` significantly impact the ratio ($p \approx 2.14e-12$, $p \approx 4.6e-11$, $p < 2e-16$, respectively), explaining $R_\text{adj}^2 \approx 0.654$, $R_\text{adj}^2 \approx 0.606$, and $R_\text{adj}^2 \approx 0.683$ of the ratio’s variance. These findings suggest that LLM coding assistance may have influenced post content by driving more complex inquiries.
+
+```{r q2-1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+npost_debug1 <- posts_df |>
+  filter(intention == "Debug") |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, quality) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, quality, fill = list(post_count = 0))
+
+npost_debug2 <- posts_df |>
+  filter(intention == "Discussion") |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, quality) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, quality, fill = list(post_count = 0))
+
+p5 <- ggplot(npost_debug1, aes(x = time_interval, y = post_count, color = quality)) +
+        geom_line(linewidth = 0.5) +
+        scale_color_manual(values = c("bad" = "gold", 
+                                      "normal" = "gold3", 
+                                      "good" = "gold4",
+                                      "controversial" = "deeppink2")) +
+        labs(title = "Distribution of Debug Post counts vs Time by Post Quality",
+             x = "Time",
+             y = "Post Count") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        legend.position = "right",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+
+p6 <- ggplot(npost_debug2, aes(x = time_interval, y = post_count, color = quality)) +
+        geom_line(linewidth = 0.5) + 
+        scale_color_manual(values = c("bad" = "gold", 
+                                      "normal" = "gold3", 
+                                      "good" = "gold4",
+                                      "controversial" = "deeppink2")) +
+        labs(title = "Distribution of Discussion Post counts vs Time by Post Quality",
+             x = "Time",
+             y = "Post Count") +
+        theme_minimal() +
+        theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        legend.position = "right",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+
+caption <- grid::textGrob("Figure. 9", gp = gpar(fontsize = 11), just = "center")
+grid.arrange(arrangeGrob(p5, p6, nrow = 2), bottom = caption, heights = unit(c(24, 1), "null"))
+```
+
+
+```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+complexity_ratio <- posts_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, complexity) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
+  mutate(ratio = `Complex`/ `Basic`)
+
+ggplot(complexity_ratio, aes(x = time_interval, y = ratio)) +
+  geom_point() +
+  geom_smooth(method = "loess", se = FALSE, linewidth = 0.8, color = "deeppink4") +
+  labs(title = "Distribution of Post Complexity Ratio vs Time",
+       x = "Time",
+       y = "Post Complexity Ratio",
+       caption = "Figure. 10") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+Figure 11 demonstrates the examination of the impact of AI tools on posts in the top 10% of popular tags. It exhibits a significant decline in posts about lists and an increase in posts about APIs around November 2022, and a decrease in posts about functions after a plateau from 2022 to 2024. The linear model with interaction terms for turnpoint and specific tags indicates that the interactions between turnpoint and tagapi ($p \approx 1.84e-5$) and turnpoint and taglist ($p \approx 1.72e-7$) are significant. The model explains 89.4% of the variance in post counts. These results suggest that AI tools might have encouraged programmers to rely on forums for more complex coding issues (e.g., APIs), while simpler tasks (e.g., lists) are increasingly handled by assistant tools.
+
+```{r q3-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+top_tags <- posts_df |> filter(tag != "None") |> group_by(tag) |> count()
+threshold <- round(quantile(top_tags$n, probs = seq(0.9, 1, 0.1), na.rm = TRUE), 2)[1]
+top_tags <- top_tags |> filter(n > threshold)
+
+npost_tag <- posts_df |>
+  filter(tag %in% top_tags$tag) |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, tag) |>
+  summarise(post_count = n(), .groups = 'drop')
+
+ggplot(npost_tag, aes(x = time_interval, y = post_count, color = tag)) +
+  geom_point() +
+  geom_smooth(method = "loess", aes(group = tag), se = FALSE, linewidth = 0.8) +
+  scale_color_brewer(palette = "Set2") +
+  labs(title = "Distribution of Post counts vs Time By Top 10% Tags",
+       x = "Time",
+       y = "Post Count",
+       caption = "Figure. 11") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 11))
+```
+
+In conclusion, the emergence of AI-assisted coding tools appears to encourage programmers to post more complex questions and discussions, rather than basic inquiries.
+
+[comment]: <> (Graphs IGNORED in Report)
+
+```{r q2-2, eval=FALSE, echo=FALSE, message=FALSE}
+npost_len <- posts_df |>
+  filter(intention == "Debug") |>
+  mutate(time_interval = floor_date(creation_date, "quarter"),
+         post_length = nchar(body))
+
+ggplot(npost_len, aes(x = as.factor(time_interval), y = post_length)) +
+  geom_boxplot(fill = "wheat2", color = "wheat4") +
+  labs(title = "Boxplot of Debug Post Lengths vs Month",
+       x = "Month",
+       y = "Post Length") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        axis.text.x = element_text(angle = 45, hjust = 1, size = 10))
+```
+
+```{r q3-1, eval=FALSE, echo=FALSE, message=FALSE}
+npost_engage <- posts_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, engagement) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, engagement, fill = list(post_count = 0))
+
+ggplot(npost_engage, aes(x = time_interval, y = post_count, color = engagement)) +
+  geom_point() +
+  geom_smooth(method = "loess", aes(group = engagement), se = FALSE, linewidth = 0.8) +
+  scale_color_manual(values = c("low" = "olivedrab3", 
+                                "moderate" = "goldenrod2", 
+                                "high" = "deeppink3")) +
+  labs(title = "Distribution of Post Counts vs Time By Post Engagement",
+       x = "Time",
+       y = "Post Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"))
+```
+
+
+```{r q3-2, eval=FALSE, echo=FALSE, message=FALSE}
+npost_quality <- posts_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, quality) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, quality, fill = list(post_count = 0))
+
+ggplot(npost_quality, aes(x = time_interval, y = post_count, color = quality)) +
+  geom_point() +
+  geom_smooth(method = "loess", aes(group = quality), se = FALSE, linewidth = 0.8) +
+  scale_color_manual(values = c("bad" = "gold", 
+                                "normal" = "gold3", 
+                                "good" = "gold4",
+                                "controversial" = "deeppink2")) +
+  labs(title = "Distribution of Post Counts vs Time By Post Quality",
+       x = "Time",
+       y = "Post Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"))
+```
+
+
+[comment]: <> (Run Models)
+
+```{r modeling, eval=TRUE, echo=FALSE, message=FALSE}
+turn_date <- "2022-11-01"
+```
+
+```{r modeling1, eval=FALSE, echo=FALSE, message=FALSE}
+npost_basic <- npost_basic |>
+  mutate(turnpoint = ifelse(time_interval < as.Date(turn_date), "before", "after"))
+
+lm1 <- lm(post_count ~ time_interval, data = npost_basic)
+summary(lm1)
+
+lm2 <- lm(post_count ~ turnpoint, data = npost_basic)
+summary(lm2)
+
+npost_basic$time <- as.numeric(npost_basic$time_interval - min(npost_basic$time_interval))
+gam1 <- gam(post_count ~ s(time, k=20), data = npost_basic)
+summary(gam1)
+```
+
+
+```{r modeling2, eval=FALSE, echo=FALSE, message=FALSE}
+npost_merged <- npost_merged |>
+  mutate(turnpoint = ifelse(time_interval < as.Date(turn_date), "before", "after"))
+
+lm1 <- lm(post_count ~ time_interval * owner_engagement, data = npost_merged)
+summary(lm1)
+
+lm2 <- lm(post_count ~ turnpoint * owner_engagement, data = npost_merged)
+summary(lm2)
+
+npost_merged$time <- as.numeric(npost_merged$time_interval - min(npost_merged$time_interval))
+gam1 <- gam(post_count ~ s(time, k=20) + owner_engagement, data = npost_merged)
+summary(gam1)
+```
+
+
+```{r modeling3, eval=FALSE, echo=FALSE, message=FALSE}
+npost_tag <- npost_tag |>
+  mutate(turnpoint = ifelse(time_interval < as.Date(turn_date), "before", "after"))
+
+lm1 <- lm(post_count ~ time_interval * tag, data = npost_tag)
+summary(lm1)
+
+lm2 <- lm(post_count ~ turnpoint * tag, data = npost_tag)
+summary(lm2)
+
+npost_tag$time <- as.numeric(npost_tag$time_interval - min(npost_tag$time_interval))
+gam1 <- gam(post_count ~ s(time, k=20) + tag, data = npost_tag)
+summary(gam1)
+```
+
+
+```{r modeling4, eval=FALSE, echo=FALSE, message=FALSE}
+user_ratio <- user_ratio |>
+  mutate(turnpoint = ifelse(time_interval < as.Date(turn_date), "before", "after"))
+
+lm1 <- lm(toexperienced ~ time_interval, data = user_ratio)
+summary(lm1)
+
+lm2 <- lm(toexperienced ~ turnpoint, data = user_ratio)
+summary(lm2)
+
+user_ratio$time <- as.numeric(user_ratio$time_interval - min(user_ratio$time_interval))
+gam1 <- gam(toexperienced ~ s(time, k=20), data = user_ratio)
+summary(gam1)
+```
+
+```{r modeling5, eval=FALSE, echo=FALSE, message=FALSE}
+lm3 <- lm(toexpert ~ time_interval, data = user_ratio)
+summary(lm3)
+
+lm4 <- lm(toexpert ~ turnpoint, data = user_ratio)
+summary(lm4)
+
+user_ratio$time <- as.numeric(user_ratio$time_interval - min(user_ratio$time_interval))
+gam2 <- gam(toexpert ~ s(time, k=20), data = user_ratio)
+summary(gam2)
+```
+
+```{r modeling6, eval=FALSE, echo=FALSE, message=FALSE}
+complexity_ratio <- complexity_ratio |>
+  mutate(turnpoint = ifelse(time_interval < as.Date(turn_date), "before", "after"))
+
+lm1 <- lm(ratio ~ time_interval, data = complexity_ratio)
+summary(lm1)
+
+lm2 <- lm(ratio ~ turnpoint, data = complexity_ratio)
+summary(lm2)
+
+complexity_ratio$time <- as.numeric(
+  complexity_ratio$time_interval - min(complexity_ratio$time_interval))
+gam1 <- gam(ratio ~ s(time, k=20), data = complexity_ratio)
+summary(gam1)
+```
+
+
+### 4 Summary
+
+**4.1 Discussion**
+
+The analysis reveals a strong correlation between time, particularly before and after November 2022, and posts’ complexity. These time points influence the number of basic question posts, the ratio of complex to basic posts, and post counts associated with specific tags. However, the effects on activeness are mainly observed in normal users, while experienced and expert users remain unaffected. This suggests that the rise of AI-assisted coding tools may have reduced beginner programmers' reliance on forums, while encouraging others to post more complex questions and discussions. These findings infer that the emergence of AI tools, notably after ChatGPT's release, could be the confounding factor. Future studies with data specifically on AI tool usage and causal analysis methods are needed for more definitive conclusions.
+
+**4.2 Planning**
+
+For the final project, we plan to refine our models and improve visualizations. Key areas for improvement include:
+
+Modeling
+
+1. Regression: Explore model choices where the data better fits the corresponding model assumptions. For instance, Gamma GLM/GLMM for right-skewed data, and GAM with optimized parameter k. 
+2. Classification: Utilize Python NLP packages or classification models to label post contents. For example, transformer models in Python, Random Forest and XGBoost. 
+
+Visualization
+
+1. Interactivity: Introduce features like data filtering, hovering for exact values, and time interval sliders for dynamic plots.
+2. Diversity: Choose effective plots for communication, with thoughtful color choices for clarity. For example, a combination of column and line timeline or bubble plot to illustrate correlation, dot plot or population pyramid to show distribution, and candlestick or streamgraph to demonstrate change over time.
+
+### References
+
+Stack Exchange. (n.d.). *Stack Exchange API documentation*. https://api.stackexchange.com/docs
+
+StackApps. (n.d.). *StackApps OAuth registration*. https://stackapps.com/apps/oauth/register
+
+Wikipedia contributors. (2024, March 10). *ChatGPT*. Wikipedia. https://en.wikipedia.org/wiki/ChatGPT
+
+Wikipedia contributors. (2024, March 10). *Stack Overflow*. Wikipedia. https://en.wikipedia.org/wiki/Stack_Overflow
+
+Stack Overflow Teams. (2024, March 10). *Content tags on Stack Overflow*. https://stackoverflowteams.help/en/articles/8872158-content-tags
