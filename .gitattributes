@@ -4,3 +4,5 @@ tags.csv filter=lfs diff=lfs merge=lfs -text
 users.csv filter=lfs diff=lfs merge=lfs -text
 data/ filter=lfs diff=lfs merge=lfs -text
 models/ filter=lfs diff=lfs merge=lfs -text
+_site/data/ filter=lfs diff=lfs merge=lfs -text
+_site/models/ filter=lfs diff=lfs merge=lfs -text
