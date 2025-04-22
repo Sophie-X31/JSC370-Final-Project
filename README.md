@@ -11,7 +11,7 @@ This project explores how AI-assisted coding tools have influenced user activity
 
 ## Report and Website
 
-- p **Analysis Report**: [written_report](written_report/final_report.html)
-- p **Interactive Website**: [View it here](https://Sophie-X31.github.io/JSC370-Final-Project/)  
+- 📄 **Analysis Report**: [written report](written_report/final_report.html)
+- 🌐 **Interactive Website**: [view it here](https://Sophie-X31.github.io/JSC370-Final-Project/)
 
 This project is for academic use only. All data are sourced from the publicly available Stack Exchange API.
