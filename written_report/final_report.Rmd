@@ -785,7 +785,7 @@ merged_df <- merged_df |>
 [comment]: <> (Illustrate Post Content Classification)
 
 ```{r create_embedding, eval=TRUE, echo=FALSE, message=FALSE}
-if (!file.exists("../data/word_vectors.rds")) {
+if (!file.exists("../data/post_embeddings.rds")) {
   # Tokenization
   tokens_df <- posts_df |>
     select(post_id, body) |>
@@ -815,8 +815,6 @@ if (!file.exists("../data/word_vectors.rds")) {
   word_vectors <- wv_main + t(glove$components)
 
   saveRDS(word_vectors, "../data/word_vectors.rds")
-} else {
-  word_vectors <- readRDS("../data/word_vectors.rds")
 }
 ```
 
