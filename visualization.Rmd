@@ -1,0 +1,577 @@
+---
+title: "Visualizations"
+output:
+  html_document: 
+    highlight: kate
+    theme: cosmo
+---
+
+The visualizations below highlight how AI-assisted coding tools may be reshaping engagement and contents on platforms like Stack Overflow. Following ChatGPT’s release in November 2022, posting behavior shifted: basic questions declined, complex posts increased, and tag-specific trends evolved. Expert user activity dropped, while experienced and normal users became more active. These patterns suggest beginners may now rely on AI for quick help, while advanced users use forums for more in-depth discussions. Overall, these trends point to the emergence of AI tools, as a likely driving factor behind the observed changes in content and user behavior on coding forums.
+
+<br>
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+# Scraping
+library(rvest); library(xml2); library(base)
+
+# Dataframe
+library(dtplyr); library(dplyr); library(tidyverse); library(Matrix)
+library(data.table); library(reshape2); library(jsonlite); library(kableExtra)
+
+# Visualization
+library(leaflet); library(wordcloud2); library(viridis); library(grid); library(gridExtra)
+library(ggplot2); library(ggcorrplot); library(plotly); library(widgetframe)
+
+# Model
+#r='http://r-forge.r-project.org'
+#install.packages('Pmisc', repos=r)
+library(mgcv); library(Pmisc); library(glmmTMB); library(performance); library(pscl)
+library(DirichletReg); library(betareg)
+
+# Language
+library(tm); library(tidytext); library(textdata); library(quanteda.textstats)
+library(topicmodels); library(tokenizers); library(stringr); library(text2vec); library(umap)
+
+# HPC
+library(microbenchmark); library(parallel); library(doParallel)
+library(furrr); library(future)
+
+# Trees
+library(randomForest); library(gbm); library(xgboost); library(caret)
+library(rpart); library(rpart.plot)
+```
+
+```{r load_data, eval=TRUE, echo=FALSE, message=FALSE}
+# Read Data
+posts_df <- fread("data/posts.csv")
+users_df <- fread("data/users.csv")
+tags_df <- fread("data/tags.csv")
+
+# Post
+colnames(posts_df) <- c("rm_account_id", "rm_reputation", "owner_id",
+                        "rm_user_type", "rm_pfp", "rm_username",
+                        "rm_user_link", "downvote_count", "upvote_count",
+                        "score", "last_activity_date", "creation_date",
+                        "post_type", "post_id", "body",
+                        "rm_link", "rm_user_ar", "rm_last_edit")
+posts_df <- posts_df |> select(-matches("^rm"))
+
+# User
+colnames(users_df) <- c("bronze_count", "silver_count", "gold_count",
+                        "downvote_count", "upvote_count", "answer_count",
+                        "question_count", "rm_acc_id", "rm_employee",
+                        "last_access_date", "rep_year", "rep_quarter",
+                        "rep_month", "rep_week", "rep_day",
+                        "reputation", "creation_date", "rm_type",
+                        "user_id", "rm_link", "rm_pfp",
+                        "rm_name", "rm_last_modified", "location",
+                        "rm_url")
+users_df <- users_df |> select(-matches("^rm"))
+
+# Tag
+tags_df <- tags_df |>
+  select(-matches("^Id|Id$")) |>
+  rename("name" = "TagName", "count" = "Count")
+```
+
+```{r color_palette, eval=TRUE, echo=FALSE, message=FALSE}
+color_pal <- c("#CACAAA", "#EEC584", "#C8AB83", "#55868C", "#7F636E")
+color_shade <- c("#A1A168", "#E29A28", "#9C7744", "#9ABCC1", "#B7A4AC")
+eight_pal <- c("#BC2C1A", "#8C2F39", "#7F636E", "#CACAAA", "#EEC584", "#C8AB83", "#55868C", "#22333B")
+```
+
+```{r eda, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Data
+users_df$lifespan <- as.numeric(difftime(users_df$last_access_date, 
+                                         users_df$creation_date, units = "days"))
+users_life <- users_df |> select(lifespan) |> mutate(type = "User")
+posts_df$lifespan <- as.numeric(difftime(posts_df$last_activity_date, 
+                                         posts_df$creation_date, units = "days"))
+posts_life <- posts_df |> select(lifespan) |> filter(lifespan > 7) |> mutate(type = "Post")
+lifespan_df <- bind_rows(users_life, posts_life)
+
+# Plot
+ggplot(lifespan_df, aes(x = type, y = lifespan, fill = type)) +
+  geom_violin(trim = FALSE, alpha = 0.7) +
+  coord_flip() +
+  scale_fill_manual(values = c("User" = color_shade[5], "Post" = color_pal[5])) +
+  labs(title = "Distribution of Lifespan: Users vs Posts",
+       x = "Category", y = "Lifespan (days)") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "none")
+```
+
+Figure. 1 Violin plots illustrating the lifespan distribution of posts that have been active for over a week (displayed at the bottom) along with the active lifespan of users (shown at the top). Both distributions have a light, long right tail, emphasizing the skewness within the dataset.
+
+```{r eda2, eval=TRUE, echo=FALSE, message=FALSE, fig.align='left', warning=FALSE}
+# Plot
+ggplot(posts_df, aes(x = upvote_count, y = downvote_count, size = score)) +
+  geom_point(alpha = 0.5, color = color_pal[4]) +
+  geom_smooth(method = "lm", color = color_shade[4], se = FALSE, alpha=0.6) +
+  scale_size_continuous(range = c(1, 10), name = "Score") +
+  labs(title = "Trend in Post Upvotes vs. Downvotes", 
+       x = "Upvote Count", y = "Downvote Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "none")
+```
+
+Figure. 2 Scatter plot comparing the number of upvotes and downvotes received by each post, with the size of the points indicating the score (computed as upvotes minus downvotes). The line of best fit indicates that posts with more upvotes tend to also receive more downvotes, possibly due to the polarizing nature of controversial posts. 
+
+```{r eda3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Data
+rep_user <- users_df |> 
+  select(user_id, reputation, rep_year, rep_quarter, rep_month, rep_week) |>
+  filter(reputation > 10)
+rep_change <- rep_user |>
+  filter(!(rep_year == 0 & rep_quarter == 0 & rep_month == 0 & rep_week == 0)) |>
+  mutate(across(c(rep_year, rep_quarter, rep_month, rep_week), 
+                ~ ifelse(. == 0, . + 1e-3, .)))
+rep_change_long <- rep_change |> 
+  pivot_longer(cols = c(rep_year, rep_quarter, rep_month, rep_week), 
+               names_to = "Metric", 
+               values_to = "Value") |>
+  filter(reputation != 1335 & reputation != 4341)
+rep_change_long$Metric <- factor(rep_change_long$Metric, 
+  levels = c("rep_year", "rep_quarter", "rep_month", "rep_week"),
+  labels = c("Year", "Quarter", "Month", "Week"))
+
+# Plot
+ggplot(rep_change_long, aes(x = Metric, y = Value, color = Metric)) +
+  geom_jitter(aes(color = Metric), alpha = 0.5) +
+  geom_boxplot(aes(fill = Metric), outlier.shape = NA, alpha = 0.8) +
+  geom_rug(data = rep_change_long, aes(x = "Reputation", y = reputation / 25), 
+           sides = "l", color = "black", alpha = 0.6) +
+  coord_flip() +
+  scale_color_manual(name = "Metric", values = color_pal) +
+  scale_fill_manual(name = "Metric", values = color_shade) +
+  labs(title = "Change in Reputation Over Time", 
+       x = "Time Granularity", 
+       y = "Reputation Change") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "top",
+        legend.direction = "horizontal",
+        legend.box = "horizontal",
+        legend.justification = "center",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+```
+
+Figure. 3 Circle timelines showing the distribution of changes in reputation across various time intervals, with the total reputation represented as a barcode plot. Outliers (total reputation of 4341 and reputation change of 212) have been omitted from this representation. The density distribution of change in reputation over months nearly coincides with weekly changes, and similarly, quarterly changes align with yearly trends. The clustering effect again confirms the skewness of the observations.
+
+```{r eda4, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Plot
+numeric_users <- select(users_df, where(is.numeric)) |> select(-user_id)
+corr_matrix <- cor(numeric_users, use = "complete.obs")
+ggcorrplot(corr_matrix, method = "square", type = "lower",
+           lab = TRUE, lab_size = 2.4,
+           colors = c("white", "white", color_pal[4]),
+           title = "Correlation Heatmap: User Features") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+```
+
+Figure. 4 Correlation heatmap depicting the correlation between different variables within the user data. The reputation changes over different time intervals are highly correlated (>0.95). Additionally, reputation is strongly correlated with answer count (0.85) and silver badge count (0.68).
+
+```{r eda5, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Plot
+tags_df |>
+  arrange(across(count, desc)) |>
+  head(20) |>
+  ggplot(aes(fct_reorder(name, count), count)) +
+  geom_bar(stat="identity", fill=color_pal[1]) +
+  coord_flip() +
+  labs(title = "Top 20 Most Popular Tags", x = "Tag", y = "Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "none")
+```
+
+Figure. 5 Bar plot ranking the top 20 tags corresponding to widely used programming languages and concepts. JavaScript ranks first, followed by Python and Java. 
+
+```{r wrangle_data, eval=TRUE, echo=FALSE, warning=FALSE, message=FALSE}
+# User
+users_df <- users_df |> select(-matches("location|rep_day|rep_week|rep_quarter"))
+users_df$badge_count <- users_df$bronze_count + users_df$silver_count + users_df$gold_count
+users_df <- users_df |> 
+  mutate(engagement = case_when(
+    (badge_count == 1 | reputation < 11) & (lifespan > 60 & lifespan < 365 * (2 + 1/4)) ~ "experienced",
+    (badge_count >= 2 | reputation >= 11) | lifespan > 365 * (2 + 1/4) ~ "expert",
+    TRUE ~ "normal"))
+users_df <- users_df |> 
+  mutate(across(c(engagement), as.factor))
+
+# Post
+posts_df <- fread("data/processed_posts.csv")
+posts_df <- posts_df |>
+  mutate(
+      across(c(post_type, engagement, quality, 
+               intention, complexity, tag, relevance), as.factor),
+      across(c(owner_id, downvote_count, upvote_count, 
+               score, post_id, vote_count), as.integer),
+      across(c(lifespan, complexity_score, debug_score), as.numeric),
+      last_activity_date = as.POSIXct(last_activity_date, format = "%Y-%m-%d %H:%M:%S"),
+      creation_date = as.POSIXct(creation_date, format = "%Y-%m-%d %H:%M:%S"))
+
+# Tag
+popular_tags <- tags_df |>
+  arrange(across(count, desc)) |>
+  head(100)
+
+# Merge
+posts_wrangled <- posts_df |>
+  select(post_id, owner_id, post_type, creation_date, engagement, quality, body)
+users_wrangled <- users_df |>
+  select(user_id, creation_date, engagement)
+merged_df <- inner_join(posts_wrangled, users_wrangled, by = c("owner_id" = "user_id"))
+merged_df <- merged_df |> 
+  rename_with(~ gsub("(.*)\\.x$", "post_\\1", .), .cols = everything()) |> 
+  rename_with(~ gsub("(.*)\\.y$", "owner_\\1", .), .cols = everything())
+merged_df <- merged_df |>
+  rename("post_quality" = "quality", "post_body" = "body")
+```
+
+```{r word_embedding, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Word Embedding
+post_embeddings <- readRDS("data/post_embeddings.rds")
+post_embeddings <- do.call(rbind, post_embeddings)
+embedding_df <- as.data.frame(post_embeddings)
+colnames(embedding_df) <- paste0("dim_", seq_len(ncol(embedding_df)))
+posts_df <- bind_cols(posts_df, embedding_df)
+
+# Boosting
+opt_boost <- readRDS("models/opt_boost")
+opt_boost2 <- readRDS("models/opt_boost2")
+opt_boost3 <- readRDS("models/opt_boost3")
+opt_boost4 <- readRDS("models/opt_boost4")
+
+# Extract Top 5 Variables
+var_imp1 <- summary(opt_boost, plotit = FALSE) |> slice_max(order_by = rel.inf, n = 5)
+var_imp2 <- summary(opt_boost2, plotit = FALSE) |> slice_max(order_by = rel.inf, n = 5)
+var_imp3 <- summary(opt_boost3, plotit = FALSE) |> slice_max(order_by = rel.inf, n = 5)
+var_imp4 <- summary(opt_boost4, plotit = FALSE) |> slice_max(order_by = rel.inf, n = 5)
+
+# Plots
+p1 <- ggplot(var_imp1, aes(x = reorder(var, rel.inf), y = rel.inf)) +
+  geom_col(fill = color_pal[1]) +
+  coord_flip() +
+  labs(title = "Post Engagement", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10))
+
+p2 <- ggplot(var_imp2, aes(x = reorder(var, rel.inf), y = rel.inf)) +
+  geom_col(fill = color_pal[1]) +
+  coord_flip() +
+  labs(title = "Post Quality", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10))
+
+p3 <- ggplot(var_imp3, aes(x = reorder(var, rel.inf), y = rel.inf)) +
+  geom_col(fill = color_shade[1]) +
+  coord_flip() +
+  labs(title = "Post Intention", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10))
+
+p4 <- ggplot(var_imp4, aes(x = reorder(var, rel.inf), y = rel.inf)) +
+  geom_col(fill = color_shade[1]) +
+  coord_flip() +
+  labs(title = "Post Complexity", x = NULL, y = NULL) +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10))
+
+# Labeling
+x_axis_title <- textGrob("Relative Influence", gp = gpar(fontsize = 10))
+y_axis_title <- textGrob("Variables", rot = 90, gp = gpar(fontsize = 10))
+main_title <- textGrob("Variable Importance Across Boosting Models", 
+                       gp = gpar(fontsize = 11, fontface = "bold"))
+grid.arrange(p1, p3, p2, p4, nrow = 2, top = main_title,
+             left = y_axis_title, bottom = x_axis_title)
+```
+
+Figure. 6 Variable importance plots highlighting the top 5 most influential features used for classifying posts. The vote counts and the active lifespan of a post emerged as strong indicators for predicting engagement level, while the downvote counts played a significant role in determining content quality. Word embeddings (dim_#) helped distinguish between debugging and discussion posts, and the inferred intention also contributed to identifying the complexity.
+
+```{r q1-1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='left', warning=FALSE}
+npost_basic <- posts_df |>
+  filter(complexity == "Basic", post_type == "question") |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval) |>
+  summarise(post_count = n(), .groups = 'drop')
+
+p <- ggplot(data = npost_basic, aes(x = time_interval, y = post_count)) +
+    geom_point(color = color_shade[5], 
+               aes(text = paste("Post Count:", post_count, "<br>Date:", time_interval))) +
+    geom_smooth(method = "loess", color = color_pal[5], linewidth = 0.8, se = FALSE) +
+    labs(title = "Distribution of Basic Question Post Counts vs Time",
+         x = "Time", y = "Post Count") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+          plot.caption = element_text(hjust = 0.5, size = 10),
+          axis.text = element_text(size = 9),
+          axis.title = element_text(size = 10),
+          legend.position = "none")
+ggplotly(p, tooltip = "text") |>
+  layout(xaxis = list(rangeslider = list(visible = TRUE)))
+```
+
+Figure. 7 Scatter plot demonstrating the trend of basic question posts over time. The number of basic question posts has been clearly declining since 2022. *Please use the slider at the bottom to zoom in on specific periods.
+
+```{r q1-2, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+npost_merged <- merged_df |>
+  mutate(time_interval = floor_date(post_creation_date, "day")) |>
+  group_by(time_interval, owner_engagement) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, owner_engagement, fill = list(post_count = 0))
+
+ggplot(npost_merged, aes(x = time_interval, y = owner_engagement, 
+                         size = post_count, color = owner_engagement)) +
+  geom_point(alpha = 0.6) +
+  scale_color_manual(values = color_pal) +
+  scale_size(range = c(1, 16)) +
+  labs(title = "Distribution of Post Counts vs Time By User Engagement",
+       x = "User Engagement Category", y = "Time", size = "Post Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        plot.caption = element_text(hjust = 0.5, size = 10),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "none")
+```
+
+Figure. 8 Circle timelines illustrating the trend in the number of posts over time, influenced by the engagement level of the post owners, with circle sizes indicating the number of posts. As shown, post activity among normal and experienced users rose from 2022 through mid-2023, followed by a noticeable drop, while expert users exhibited a steady decline in posting since 2021. 
+
+```{r q1-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Data
+user_ratio <- users_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, engagement) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = engagement, values_from = count, values_fill = list(count = 0)) |>
+  mutate(experienced_share = experienced / (experienced + expert + normal),
+         expert_share = expert / (experienced + expert + normal),
+         normal_share = normal / (experienced + expert + normal)) |>
+  complete(time_interval, fill = list(experienced = 0, normal = 0, expert = 0))
+
+user_ratio_long <- user_ratio |>
+  select(-c(experienced, expert, normal)) |>
+  rename(experienced = experienced_share,
+         expert = expert_share,
+         normal = normal_share) |>
+  pivot_longer(cols = c(experienced, expert, normal),
+               names_to = "engagement", 
+               values_to = "share")
+
+# Plot
+ggplot(user_ratio_long, aes(x = time_interval, y = share, fill = engagement)) +
+  geom_area(alpha = 0.8) +
+  scale_fill_manual(values = c(color_shade[5], "#9C818D", color_pal[5])) +  
+  labs(title = "User Engagement Distribution Over Time",
+       x = "Time", y = "User Share",
+       fill = "Engagement Level") +
+  theme_minimal() + 
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        axis.text = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "top",
+        legend.title = element_text(size = 8),
+        legend.text = element_text(size = 8))
+```
+
+Figure. 9 Area chart showing the change in the proportion of users across different engagement levels over time. The share of experienced and normal users has steadily increased, while the share of expert users has declined drastically.
+
+```{r q2-1, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Data
+npost_intention <- posts_df |>
+  mutate(time_interval = floor_date(creation_date, "day")) |>
+  group_by(time_interval, quality, intention) |>
+  summarise(post_count = n(), .groups = 'drop') |>
+  complete(time_interval, quality, intention, fill = list(post_count = 0))
+
+# Plot
+p1 <- npost_intention |>
+  filter(intention == "Debug") |>
+  ggplot(aes(x = time_interval, y = quality, 
+                           size = post_count, color = quality)) +
+    geom_point(alpha = 0.6) +
+    scale_color_manual(values = c(color_pal[1:4])) +
+    scale_size(range = c(1, 12)) +
+    labs(title = "Debug Post Counts Over Time by Post Quality",
+         x = "Time Interval", y = "Post Quality", 
+         size = "Post Count", color = "Post Quality") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+          axis.text = element_text(size = 9),
+          axis.title = element_text(size = 10),
+          legend.position = "none")
+
+p2 <- npost_intention |>
+  filter(intention == "Discussion") |>
+  ggplot(aes(x = time_interval, y = quality, 
+                           size = post_count, color = quality)) +
+    geom_point(alpha = 0.6) +
+    scale_color_manual(values = c(color_shade[1:4])) +
+    scale_size(range = c(1, 12)) +
+    labs(title = "Discussion Post Counts Over Time by Post Quality",
+         x = "Time Interval", y = "Post Quality", 
+         size = "Post Count", color = "Post Quality") +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+          axis.text = element_text(size = 9),
+          axis.title = element_text(size = 10),
+          legend.position = "none")
+
+# Interactive Plot
+p1_plotly <- ggplotly(p1)
+p2_plotly <- ggplotly(p2)
+
+# Set visibility: Show p1 By Default
+all_traces <- c(p1_plotly$x$data, p2_plotly$x$data)
+for (i in seq_along(all_traces)) {
+  all_traces[[i]]$visible <- i <= length(p1_plotly$x$data)
+}
+
+# Create Dropdown
+plotly_combined <- plotly::plot_ly()
+plotly_combined$x$data <- all_traces
+plotly_combined <- layout(
+  plotly_combined,
+  title = "Post Counts Over Time by Post Quality",
+  xaxis = p1_plotly$x$layout$xaxis,
+  yaxis = p1_plotly$x$layout$yaxis,
+  showlegend = FALSE,
+  updatemenus = list(
+    list(
+      type = "dropdown",
+      active = 0,
+      buttons = list(
+        list(
+          label = "Debug",
+          method = "restyle",
+          args = list("visible", c(rep(TRUE, length(p1_plotly$x$data)), rep(FALSE, length(p2_plotly$x$data))))
+        ),
+        list(
+          label = "Discussion",
+          method = "restyle",
+          args = list("visible", c(rep(FALSE, length(p1_plotly$x$data)), rep(TRUE, length(p2_plotly$x$data))))
+        )
+      )
+    )
+  )
+)
+
+plotly_combined
+```
+
+Figure. 10 Circle Timelines reflecting the variation in the number of posts categorized by quality over time. The number of normal-quality debugging posts has slightly increased since 2023, while good-quality discussion posts have declined over the same period. Other content categories remained relatively unchanged. *Please use the button to select distributions related to discussion or debug posts.
+
+```{r q2-2, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+umap_result <- readRDS("data/umap.rds")
+posts_cleaned <- posts_df |> filter(!if_any(starts_with("dim_"), is.na))
+posts_cleaned$UMAP1 <- umap_result$layout[,1]
+posts_cleaned$UMAP2 <- umap_result$layout[,2]
+posts_cleaned$year <- lubridate::year(posts_cleaned$creation_date)
+
+plot_ly(posts_cleaned,
+        x = ~UMAP1,
+        y = ~UMAP2,
+        frame = ~year,
+        text = ~paste("Post ID:", post_id, "<br>Year:", year),
+        hoverinfo = "text",
+        type = "scatter",
+        mode = "markers",
+        marker = list(size = 12, opacity = 0.8, color = color_pal[5])) |>
+  layout(title = "Change in Posts' Word Embeddings Over Time",
+         xaxis = list(title = "UMAP1"),
+         yaxis = list(title = "UMAP2"),
+         legend = list(title = list(text = "Year"))) |>
+  animation_opts(frame = 100, redraw = TRUE) |>
+  animation_slider(currentvalue = list(prefix = "Year: ", font = list(size = 12)))
+```
+
+Figure. 11 Scatter plot illustrating the shift in post wording and structure over time, based on word embedding projections. The visible shifts in clustering patterns over time suggest structural changes in how users compose their posts. *Please use the button to display the animated change through time.
+
+```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+complexity_ratio <- posts_df |>
+  mutate(year = year(creation_date), 
+         month = factor(month(creation_date), levels = 1:12, labels = month.abb)) |>
+  group_by(year, month, complexity) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
+  mutate(ratio = `Complex` / `Basic`)
+
+ggplot(complexity_ratio, aes(x = year, y = month, fill = ratio)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#E0CFB8", high = color_shade[3]) +
+  labs(title = "Distribution of Post Complexity Ratio Over Time",
+       x = "Year", y = "Month", fill = "C/B Ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "right",
+        panel.spacing = unit(0.5, "lines"))
+```
+
+Figure. 12 Calendar heatmap presenting the trend in the ratio of complex to basic posts over time, with the ratio represented as C/B (complex/basic). There has been a consistent rise in the ratio of complex to basic posts since November 2022.
+
+```{r q3-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+# Data
+top_tags <- posts_df |> filter(tag != "None") |> group_by(tag) |> count()
+threshold <- round(quantile(top_tags$n, probs = seq(0.9, 1, 0.1), na.rm = TRUE), 2)[1]
+top_tags <- top_tags |> filter(n > threshold)
+npost_tag <- posts_df |>
+  filter(tag %in% top_tags$tag) |>
+  mutate(time_interval = floor_date(creation_date, "day"),
+         year = year(creation_date)) |>
+  group_by(year, time_interval, tag) |>
+  summarise(post_count = n(), .groups = 'drop')
+
+# Plot
+plot_ly(npost_tag, 
+        x = ~tag, 
+        y = ~post_count, 
+        color = ~tag,
+        colors = eight_pal,
+        frame = ~year,
+        text = ~paste("<br>Post Count:", post_count, "<br>Time:", time_interval), 
+        hoverinfo = "text",
+        type = "scatter", 
+        mode = "markers",
+        marker = list(size = 8, opacity = 0.7)) |>
+  layout(title = "Post Count Trends Over Time by Tag",
+         xaxis = list(title = "Tag", categoryorder = "array", 
+                      categoryarray = unique(npost_tag$tag)), 
+         yaxis = list(title = "Post Count"),
+         legend = list(title = list(text = "Tags"))) |>
+  animation_opts(frame = 100, redraw = TRUE) |>
+  animation_slider(currentvalue = list(prefix = "Time: ", font = list(size = 10)))
+```
+
+Figure. 13 Scatter plot illustrating the change in post counts associated with the top 10% of popular tags over time. The plot exhibits a significant decline in posts related to basic concepts such as lists and functions, while posts tagged with more complex topics like APIs have surged. *Please use the button to display the animated changes through time.

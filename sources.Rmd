@@ -1,0 +1,41 @@
+---
+title: "Sources"
+output:
+  html_document: 
+    highlight: kate
+    theme: cosmo
+---
+
+The following sources provide valuable perspectives and findings that extend the conclusions drawn from this data analysis, offering broader context on how AI tools are shaping programmer communities.
+
+**Related Work**
+
+Cheng, R., Wang, R., Zimmermann, T., & Ford, D. (2024). “It would work for me too”: How online communities shape software developers’ trust in AI-powered code generation tools. ACM Transactions on Interactive Intelligent Systems, 14(2), Article 11, 39 pages. https://doi.org/10.1145/3651990
+
+Ghimire, A., & Edwards, J. (2024). Coding with AI: How are tools like ChatGPT being used by students in foundational programming courses. In A. M. Olney, I. A. Chounta, Z. Liu, O. C. Santos, & I. I. Bittencourt (Eds.), Artificial Intelligence in Education. AIED 2024 (Lecture Notes in Computer Science, Vol. 14830). Springer, Cham. https://doi.org/10.1007/978-3-031-64299-9_20
+
+Li, X., & Kim, K. (2024). Impacts of generative AI on user contributions: Evidence from a coding Q & A platform. Marketing Letters. https://doi.org/10.1007/s11002-024-09747-1
+
+<br>
+
+The sources below were referenced in the written report and also informed the design choices and analytical focus of this project.
+
+**Background**
+
+Wikipedia contributors. (2024, March 10). ChatGPT. Wikipedia. https://en.wikipedia.org/wiki/ChatGPT
+
+Wikipedia contributors. (2024, March 10). Stack Overflow. Wikipedia. https://en.wikipedia.org/wiki/Stack_Overflow
+
+**Documentation**
+
+Stack Exchange. (n.d.). Stack Exchange API documentation. Retrieved April 21, 2025, from https://api.stackexchange.com/docs
+
+Stack Overflow Teams. (2024, March 10). Content tags on Stack Overflow. Retrieved April 21, 2025, from https://stackoverflowteams.help/en/articles/8872158-content-tags
+
+StackApps. (n.d.). StackApps OAuth registration. Retrieved April 21, 2025, from https://stackapps.com/apps/oauth/register
+
+**Visualization**
+
+Berinato, S. (n.d.). Visual vocabulary [Tableau dashboard]. Tableau Public. Retrieved April 21, 2025, from https://public.tableau.com/views/VisualVocabulary/VisualVocabulary?%3Aembed=y&%3Adisplay_count=yes&publish=yes&%3AshowVizHome=no
+
+Financial Times. (n.d.). Visual vocabulary. GitHub. Retrieved April 21, 2025, from https://github.com/Financial-Times/chart-doctor/tree/main/visual-vocabulary

@@ -1,0 +1,19 @@
+name: "JSC370 Final Project"
+title: "JSC370 Final Project"
+
+navbar:
+  title: "JSC370 Final Project"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "Visualizations"
+      href: visualization.html
+    - text: "Sources"
+      href: sources.html
+
+output:
+  html_document:
+    highlight: kate
+    theme: cosmo
+    toc: true
+    toc_float: true
