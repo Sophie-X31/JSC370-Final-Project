@@ -7,11 +7,11 @@ This project explores how AI-assisted coding tools have influenced user activity
 - `data/`: Contains the raw and cleaned datasets retrieved via the Stack Overflow API.
 - `models/`: Includes saved model objects used for statistical analysis.
 - `written_report/`: Contains the full written analysis report in both R Markdown and HTML format.
-- `_site/`: Contains the necessary files used to generate the GitHub Pages website.
+- `_docs/`: Contains the necessary files used to generate the GitHub Pages website.
 
 ## Report and Website
 
-- 📄 **Analysis Report**: [written report](written_report/final_report.html)
+- 📄 **Analysis Report**: [written report](written_report/final_report.pdf)
 - 🌐 **Interactive Website**: [view it here](https://Sophie-X31.github.io/JSC370-Final-Project/)
 
 This project is for academic use only. All data are sourced from the publicly available Stack Exchange API.
