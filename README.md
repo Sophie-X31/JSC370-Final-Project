@@ -6,8 +6,8 @@ This project explores how AI-assisted coding tools have influenced user activity
 
 - `data/`: Contains the raw and cleaned datasets retrieved via the Stack Overflow API.
 - `models/`: Includes saved model objects used for statistical analysis.
-- `written_report/`: Contains the full written analysis report in both R Markdown and HTML format.
-- `The other files are used to generate the GitHub Pages website.
+- `written_report/`: Contains the full written analysis report in PDF, R Markdown and HTML format.
+- The other files are used to generate the GitHub Pages website.
 
 ## Report and Website
 
