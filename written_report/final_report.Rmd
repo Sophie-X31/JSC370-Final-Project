@@ -434,7 +434,7 @@ The skewness could be explained by the possibility that a small proportion of ba
 
 3.1.2 User
 
-A similar skewed distribution is observed in the users dataset. Users are far more likely to upvote posts as a form of agreement or encouragement, while only 0.04% have ever downvoted a post. Badge counts also reflect this imbalance, up to the third quantile, users hold zero silver or gold badges, as well as zero upvotes or downvotes. Likewise, user reputation follows an extreme skew, with the minimum, median, and third quantile all valued at 1, while the maximum reaches 4,341.
+A similar skewed distribution is observed in the users dataset. Users are far more likely to upvote posts as a form of agreement or encouragement, while only 0.04% have ever downvoted a post. Badge counts also reflect this imbalance, up to the third quantile, users hold zero silver or gold badges, as well as zero upvotes or downvotes. User reputation follows an extreme skew as shown in Figure 3, with the minimum, median, and third quantile all valued at 1, while the maximum reaches 4,341.
 
 ```{r eda1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
 # Filter Users with Non-Minimal Reputation
@@ -1178,7 +1178,38 @@ Figure. 7 Scatter plot demonstrating the trend of basic question posts over time
 </center>
 
 <br>
-We also hypothesized that AI tools might reduce contributions from normal users. As shown in Figure 8, post activity among normal and experienced users rose from 2022 through mid-2023, followed by a noticeable drop, while expert users exhibited a steady decline in posting since 2021. This is contrary to our hypothesis. The GLM found that after ChatGPT's launch ($p < 2e-16$), normal user status ($p \approx 0.018$), and their interaction term ($p \approx 0.0407$) were all significant predictors of post counts. The GAM model explains 69.8% of the deviance, outperforming the GLM (pseudo R^2 \approx 0.3596). Note these results are based on the merged dataset instead of full datasets, which may introduce sample bias due to its smaller size.
+A clear trend emerges when examining the complexity of posts. Figure 8 shows a consistent rise in the ratio of complex to basic posts. The Beta regression model indicates that both the time variable ($p \approx 0.0005$) and the `turnpoint` ($p < 2e-16$) significantly influenced this ratio, with the model explaining 71.67% of the deviance. These findings suggest that users are increasingly turning to forums for more complex coding inquiries and responses, possibly leaving simpler tasks to LLM coding assistance.
+
+```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
+# Segment by Month
+complexity_ratio <- posts_df |>
+  mutate(year = year(creation_date), 
+         month = factor(month(creation_date), levels = 1:12, labels = month.abb)) |>
+  group_by(year, month, complexity) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
+  mutate(ratio = `Complex` / `Basic`)
+
+# Calendar Heatmap
+ggplot(complexity_ratio, aes(x = year, y = month, fill = ratio)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#E0CFB8", high = color_shade[3]) +
+  labs(title = "Distribution of Post Complexity Ratio Over Time",
+       x = "Year", y = "Month", fill = "C/B Ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "right",
+        panel.spacing = unit(0.5, "lines"))
+```
+<center>
+Figure. 8 Calendar heatmap presenting the trend in the ratio of complex to basic posts over time, with the ratio represented as C/B (complex/basic). 
+</center>
+
+<br>
+We also hypothesized that AI tools might reduce contributions from normal users. As shown in Figure 9, post activity among normal and experienced users rose from 2022 through mid-2023, followed by a noticeable drop, while expert users exhibited a steady decline in posting since 2021. This is contrary to our hypothesis. The GLM found that after ChatGPT's launch ($p < 2e-16$), normal user status ($p \approx 0.018$), and their interaction term ($p \approx 0.0407$) were all significant predictors of post counts. The GAM model explains 69.8% of the deviance, outperforming the GLM (pseudo R^2 \approx 0.3596). Note these results are based on the merged dataset instead of full datasets, which may introduce sample bias due to its smaller size.
 
 ```{r q1-2, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
 npost_merged <- merged_df |>
@@ -1202,11 +1233,11 @@ ggplot(npost_merged, aes(x = time_interval, y = owner_engagement,
         legend.position = "none")
 ```
 <center>
-Figure. 8 Circle timelines illustrating the trend in the number of posts over time, influenced by the engagement level of the post owners, with circle sizes indicating the number of posts. 
+Figure. 9 Circle timelines illustrating the trend in the number of posts over time, influenced by the engagement level of the post owners, with circle sizes indicating the number of posts. 
 </center>
 
 <br>
-Additionally, we explored whether the composition of user types has shifted. Figure 9 shows the share of experienced and normal users has steadily increased, while the share of expert users has declined drastically. The Dirichlet regression model confirms the significance of `turnpoint` ($p \approx 5.85e-7; p \approx 5.8e-13$) and the time variable ($p \approx 0.0080; p \approx 0.0113$) in impacting experienced and normal user shares, respectively. Before the `turnpoint` also significantly impacted the share of expert users ($p \approx 0.0005$), underscoring the influence of AI tools in reshaping platform participation. The model achieved a strong McFadden’s pseudo R-squared of 0.3675.
+Additionally, we explored whether the composition of user types has shifted. Figure 10 shows the share of experienced and normal users has steadily increased, while the share of expert users has declined drastically. The Dirichlet regression model confirms the significance of `turnpoint` ($p \approx 5.85e-7; p \approx 5.8e-13$) and the time variable ($p \approx 0.0080; p \approx 0.0113$) in impacting experienced and normal user shares, respectively. Before the `turnpoint` also significantly impacted the share of expert users ($p \approx 0.0005$), underscoring the influence of AI tools in reshaping platform participation. The model achieved a strong McFadden’s pseudo R-squared of 0.3675.
 
 ```{r q1-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
 # Reshape Data
@@ -1247,15 +1278,14 @@ ggplot(user_ratio_long, aes(x = time_interval, y = share, fill = engagement)) +
         legend.text = element_text(size = 8))
 ```
 <center>
-Figure. 9 Area chart showing the change in the proportion of users across different engagement levels over time. 
-</center>
+Figure. 10 Area chart showing the change in the proportion of users across different engagement levels over time. </center>
 
 <br>
 In summary, AI-assisted coding tools appear to have reduced reliance on coding forums among beginner programmers asking basic questions. However, the engagement level of advanced users has declined.
 
 3.2.2 Impact on Content Structure
 
-Beyond engagement and reliance, we are also interested in examining whether LLM coding assistance have influenced the nature of content posted on coding forums. Figure 10 compares debugging and discussion-oriented posts, highlighting that the number of normal-quality debugging posts has slightly increased since 2023 ($p < 2e-16$), while good-quality discussion posts have declined over the same period ($p < 1.84e-6$). Other content categories remained relatively unchanged. The GAM including the interaction between post quality and intention explained 97.6% of the deviance in post volume.
+Beyond engagement and reliance, we are also interested in examining whether LLM coding assistance have influenced the nature of content posted on coding forums. Figure 11 compares debugging and discussion-oriented posts, highlighting that the number of normal-quality debugging posts has slightly increased since 2023 ($p < 2e-16$), while good-quality discussion posts have declined over the same period ($p < 1.84e-6$). Other content categories remained relatively unchanged. The GAM including the interaction between post quality and intention explained 97.6% of the deviance in post volume.
 
 ```{r q2-1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
 # Select Categories
@@ -1343,7 +1373,7 @@ plotly_combined
 ```
 
 <center>
-Figure. 10 Circle Timelines reflecting the variation in the number of posts categorized by quality over time. Please use the button to select distributions related to discussion or debug posts. 
+Figure. 11 Circle Timelines reflecting the variation in the number of posts categorized by quality over time. Please use the button to select distributions related to discussion or debug posts. 
 </center>
 
 <br>
@@ -1367,8 +1397,8 @@ plot_ly(posts_cleaned,
         x = ~UMAP1,
         y = ~UMAP2,
         frame = ~year,
-        text = ~paste("Post ID:", post_id, "<br>Year:", year),
-        hoverinfo = "text",
+        #text = ~paste("Post ID:", post_id, "<br>Year:", year),
+        hoverinfo = "skip", #text
         type = "scatter",
         mode = "markers",
         marker = list(size = 12, opacity = 0.8, color = color_pal[5])) |>
@@ -1376,43 +1406,12 @@ plot_ly(posts_cleaned,
          xaxis = list(title = "UMAP1"),
          yaxis = list(title = "UMAP2"),
          legend = list(title = list(text = "Year"))) |>
-  animation_opts(frame = 100, redraw = TRUE) |>
+  animation_opts(frame = 10, redraw = TRUE) |>
   animation_slider(currentvalue = list(prefix = "Year: ", font = list(size = 12)))
 ```
 
 <center>
-Figure. 11 Scatter plot illustrating the shift in post wording and structure over time based on word embedding projections. Please use the button to display the animated change through time.
-</center>
-
-<br>
-A clearer trend emerges when examining the complexity of posts. Figure 12 shows a consistent rise in the ratio of complex to basic posts. The Beta regression model indicates that both the time variable ($p \approx 0.0005$) and the `turnpoint` ($p < 2e-16$) significantly influenced this ratio, with the model explaining 71.67% of the deviance. These findings suggest that users are increasingly turning to forums for more complex coding inquiries and responses, possibly leaving simpler tasks to LLM coding assistance.
-
-```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, fig.align='center'}
-# Segment by Month
-complexity_ratio <- posts_df |>
-  mutate(year = year(creation_date), 
-         month = factor(month(creation_date), levels = 1:12, labels = month.abb)) |>
-  group_by(year, month, complexity) |>
-  summarise(count = n(), .groups = 'drop') |>
-  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
-  mutate(ratio = `Complex` / `Basic`)
-
-# Calendar Heatmap
-ggplot(complexity_ratio, aes(x = year, y = month, fill = ratio)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient(low = "#E0CFB8", high = color_shade[3]) +
-  labs(title = "Distribution of Post Complexity Ratio Over Time",
-       x = "Year", y = "Month", fill = "C/B Ratio") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
-        axis.text.x = element_text(size = 9),
-        axis.text.y = element_text(size = 9),
-        axis.title = element_text(size = 10),
-        legend.position = "right",
-        panel.spacing = unit(0.5, "lines"))
-```
-<center>
-Figure. 12 Calendar heatmap presenting the trend in the ratio of complex to basic posts over time, with the ratio represented as C/B (complex/basic). 
+Figure. 12 Scatter plot illustrating the shift in post wording and structure over time based on word embedding projections. Please use the button to display the animated change through time.
 </center>
 
 <br>

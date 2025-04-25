@@ -1,5 +1,6 @@
 name: "JSC370 Final Project"
 title: "JSC370 Final Project"
+output_dir: "."
 
 navbar:
   title: "JSC370 Final Project"

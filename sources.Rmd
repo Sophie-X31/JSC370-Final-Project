@@ -6,9 +6,9 @@ output:
     theme: cosmo
 ---
 
-The following sources provide valuable perspectives and findings that extend the conclusions drawn from this data analysis, offering broader context on how AI tools are shaping programmer communities.
+### Related Work
 
-**Related Work**
+The following sources provide valuable perspectives and findings that extend the conclusions drawn from this data analysis, offering broader context on how AI tools are shaping programmer communities.
 
 Cheng, R., Wang, R., Zimmermann, T., & Ford, D. (2024). “It would work for me too”: How online communities shape software developers’ trust in AI-powered code generation tools. ACM Transactions on Interactive Intelligent Systems, 14(2), Article 11, 39 pages. https://doi.org/10.1145/3651990
 
@@ -16,7 +16,7 @@ Ghimire, A., & Edwards, J. (2024). Coding with AI: How are tools like ChatGPT be
 
 Li, X., & Kim, K. (2024). Impacts of generative AI on user contributions: Evidence from a coding Q & A platform. Marketing Letters. https://doi.org/10.1007/s11002-024-09747-1
 
-<br>
+### Reference
 
 The sources below were referenced in the written report and also informed the design choices and analytical focus of this project.
 

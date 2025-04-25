@@ -8,4 +8,13 @@ output:
 
 Welcome! This project explores how AI-assisted coding tools have influenced activity on Stack Overflow — one of the largest coding discussion forums. By analyzing posts from 2021 to 2025, we compare user behavior and content before and after the launch of ChatGPT in November 2022. The analysis aims to uncover whether AI tools have reduced programmers' reliance on forums for help and how these tools have shaped the complexity, quality, and structure of posts over time. 
 
+R libraries used in this project:
+
+* API Data Retrieval: `httr`
+* Cleaning and Wrangling: `tidyverse`, `dplyr`, `data.table`
+* Natural Language Processing: `stringr`, `topicmodels`, `tokenizers`, `text2vec`
+* Distributed Processing: `furrr`, `future`, `parallel`
+* Visualization: `ggplot2`, `ggcorrplot`, `plotly`, `gridExtra`
+* Modeling: `rpart`, `randomForest`, `gbm`, `xgboost`, `caret`, `mgcv`, `glmmTMB`, `DirichletReg`, `betareg`, `pscl`
+
 The full data report can be downloaded <a href="written_report/final_report.pdf" target="_blank" rel="noopener noreferrer">here</a>. Use the tabs above to explore interactive visualizations and see a list of additional sources and information.

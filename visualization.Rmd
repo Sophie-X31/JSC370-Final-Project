@@ -8,7 +8,7 @@ output:
 
 The visualizations below highlight how AI-assisted coding tools may be reshaping engagement and contents on platforms like Stack Overflow. Following ChatGPT’s release in November 2022, posting behavior shifted: basic questions declined, complex posts increased, and tag-specific trends evolved. Expert user activity dropped, while experienced and normal users became more active. These patterns suggest beginners may now rely on AI for quick help, while advanced users use forums for more in-depth discussions. Overall, these trends point to the emergence of AI tools, as a likely driving factor behind the observed changes in content and user behavior on coding forums.
 
-<br>
+### Exploratory Data Analysis
 
 ```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
 # Scraping
@@ -317,6 +317,8 @@ grid.arrange(p1, p3, p2, p4, nrow = 2, top = main_title,
 
 Figure. 6 Variable importance plots highlighting the top 5 most influential features used for classifying posts. The vote counts and the active lifespan of a post emerged as strong indicators for predicting engagement level, while the downvote counts played a significant role in determining content quality. Word embeddings (dim_#) helped distinguish between debugging and discussion posts, and the inferred intention also contributed to identifying the complexity.
 
+### Statistical Modeling
+
 ```{r q1-1, eval=TRUE, echo=FALSE, message=FALSE, fig.align='left', warning=FALSE}
 npost_basic <- posts_df |>
   filter(complexity == "Basic", post_type == "question") |>
@@ -342,6 +344,31 @@ ggplotly(p, tooltip = "text") |>
 
 Figure. 7 Scatter plot demonstrating the trend of basic question posts over time. The number of basic question posts has been clearly declining since 2022. *Please use the slider at the bottom to zoom in on specific periods.
 
+```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
+complexity_ratio <- posts_df |>
+  mutate(year = year(creation_date), 
+         month = factor(month(creation_date), levels = 1:12, labels = month.abb)) |>
+  group_by(year, month, complexity) |>
+  summarise(count = n(), .groups = 'drop') |>
+  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
+  mutate(ratio = `Complex` / `Basic`)
+
+ggplot(complexity_ratio, aes(x = year, y = month, fill = ratio)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low = "#E0CFB8", high = color_shade[3]) +
+  labs(title = "Distribution of Post Complexity Ratio Over Time",
+       x = "Year", y = "Month", fill = "C/B Ratio") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+        axis.text.x = element_text(size = 9),
+        axis.text.y = element_text(size = 9),
+        axis.title = element_text(size = 10),
+        legend.position = "right",
+        panel.spacing = unit(0.5, "lines"))
+```
+
+Figure. 8 Calendar heatmap presenting the trend in the ratio of complex to basic posts over time, with the ratio represented as C/B (complex/basic). There has been a consistent rise in the ratio of complex to basic posts since November 2022.
+
 ```{r q1-2, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
 npost_merged <- merged_df |>
   mutate(time_interval = floor_date(post_creation_date, "day")) |>
@@ -364,7 +391,7 @@ ggplot(npost_merged, aes(x = time_interval, y = owner_engagement,
         legend.position = "none")
 ```
 
-Figure. 8 Circle timelines illustrating the trend in the number of posts over time, influenced by the engagement level of the post owners, with circle sizes indicating the number of posts. As shown, post activity among normal and experienced users rose from 2022 through mid-2023, followed by a noticeable drop, while expert users exhibited a steady decline in posting since 2021. 
+Figure. 9 Circle timelines illustrating the trend in the number of posts over time, influenced by the engagement level of the post owners, with circle sizes indicating the number of posts. As shown, post activity among normal and experienced users rose from 2022 through mid-2023, followed by a noticeable drop, while expert users exhibited a steady decline in posting since 2021. 
 
 ```{r q1-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
 # Data
@@ -403,7 +430,7 @@ ggplot(user_ratio_long, aes(x = time_interval, y = share, fill = engagement)) +
         legend.text = element_text(size = 8))
 ```
 
-Figure. 9 Area chart showing the change in the proportion of users across different engagement levels over time. The share of experienced and normal users has steadily increased, while the share of expert users has declined drastically.
+Figure. 10 Area chart showing the change in the proportion of users across different engagement levels over time. The share of experienced and normal users has steadily increased, while the share of expert users has declined drastically.
 
 ```{r q2-1, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
 # Data
@@ -488,7 +515,7 @@ plotly_combined <- layout(
 plotly_combined
 ```
 
-Figure. 10 Circle Timelines reflecting the variation in the number of posts categorized by quality over time. The number of normal-quality debugging posts has slightly increased since 2023, while good-quality discussion posts have declined over the same period. Other content categories remained relatively unchanged. *Please use the button to select distributions related to discussion or debug posts.
+Figure. 11 Circle Timelines reflecting the variation in the number of posts categorized by quality over time. The number of normal-quality debugging posts has slightly increased since 2023, while good-quality discussion posts have declined over the same period. Other content categories remained relatively unchanged. *Please use the button to select distributions related to discussion or debug posts.
 
 ```{r q2-2, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
 umap_result <- readRDS("data/umap.rds")
@@ -514,32 +541,7 @@ plot_ly(posts_cleaned,
   animation_slider(currentvalue = list(prefix = "Year: ", font = list(size = 12)))
 ```
 
-Figure. 11 Scatter plot illustrating the shift in post wording and structure over time, based on word embedding projections. The visible shifts in clustering patterns over time suggest structural changes in how users compose their posts. *Please use the button to display the animated change through time.
-
-```{r q2-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
-complexity_ratio <- posts_df |>
-  mutate(year = year(creation_date), 
-         month = factor(month(creation_date), levels = 1:12, labels = month.abb)) |>
-  group_by(year, month, complexity) |>
-  summarise(count = n(), .groups = 'drop') |>
-  pivot_wider(names_from = complexity, values_from = count, values_fill = list(count = 0)) |>
-  mutate(ratio = `Complex` / `Basic`)
-
-ggplot(complexity_ratio, aes(x = year, y = month, fill = ratio)) +
-  geom_tile(color = "white") +
-  scale_fill_gradient(low = "#E0CFB8", high = color_shade[3]) +
-  labs(title = "Distribution of Post Complexity Ratio Over Time",
-       x = "Year", y = "Month", fill = "C/B Ratio") +
-  theme_minimal() +
-  theme(plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
-        axis.text.x = element_text(size = 9),
-        axis.text.y = element_text(size = 9),
-        axis.title = element_text(size = 10),
-        legend.position = "right",
-        panel.spacing = unit(0.5, "lines"))
-```
-
-Figure. 12 Calendar heatmap presenting the trend in the ratio of complex to basic posts over time, with the ratio represented as C/B (complex/basic). There has been a consistent rise in the ratio of complex to basic posts since November 2022.
+Figure. 12 Scatter plot illustrating the shift in post wording and structure over time, based on word embedding projections. The visible shifts in clustering patterns over time suggest structural changes in how users compose their posts. *Please use the button to display the animated change through time.
 
 ```{r q3-3, eval=TRUE, echo=FALSE, message=FALSE, warning=FALSE, fig.align='left'}
 # Data
