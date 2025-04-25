@@ -1,4 +1,4 @@
-# JSC370 Final Project: The Impact of AI-Assisted Coding Tools on Stack Overflow
+# JSC370 Final Project: Overflowing with AI
 
 This project explores how AI-assisted coding tools have influenced user activity and content trends on Stack Overflow, one of the largest coding discussion forums. By analyzing posting behavior before and after the release of ChatGPT in November 2022, the project examines changes in post contents and user engagement.
 

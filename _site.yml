@@ -3,7 +3,7 @@ title: "JSC370 Final Project"
 output_dir: "."
 
 navbar:
-  title: "JSC370 Final Project"
+  title: "Overflowing with AI"
   left:
     - text: "Home"
       href: index.html
